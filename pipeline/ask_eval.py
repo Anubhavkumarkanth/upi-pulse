@@ -4,8 +4,9 @@ Each question in pipeline/ask_questions.json has a reference query and the answe
 is right when its result has the same number of rows as the reference answer, and every value of each reference row
 appears in a row of its result. Extra columns are fine. Numbers match to within 0.1% (or 0.005), and a month may be
 written in any common form ('2025-10-01', 'Oct 2025'). A refused or failed query counts as wrong.
-Writes docs/ask_eval.json, which the site and the README quote, but only after a full run: if no model answered some
-questions (busy or out of quota), the run is printed and not written, since that would score availability, not accuracy.
+Writes docs/ask_eval.json, which the site and the README quote, but only once every question has a reply: a missing
+reply (busy or out of quota) says nothing about accuracy. An unfinished run is kept in data/processed/ (not published),
+and a second run on the same day asks only the questions that got no reply, so each question still has exactly one answer.
 Usage: python -m pipeline.ask_eval [--provider gemini|claude]
        python -m pipeline.ask_eval --update-answers   (re-runs the reference queries after a data change; no model)
 """
@@ -21,6 +22,7 @@ from pipeline.insights import load_key
 
 QUESTIONS = Path(__file__).with_name("ask_questions.json")
 OUT = DATA.with_name("ask_eval.json")
+PARTIAL = DATA.parents[1] / "data" / "processed" / "ask_eval_partial.json"  # unfinished run, kept local
 PAUSE = 10  # seconds between questions, to stay under the free tier's per-minute limit
 RETRIES = 2  # extra rounds for questions no model answered
 
@@ -93,12 +95,17 @@ def main() -> None:
         return
     provider = sys.argv[sys.argv.index("--provider") + 1] if "--provider" in sys.argv else "gemini"
     load_key(provider)
-    report = evaluate(asker, questions, PROVIDERS[provider], pause=PAUSE)
-    for _ in range(RETRIES):  # busy free models often answer a minute later, so ask the unanswered questions again
+    previous = json.loads(PARTIAL.read_text(encoding="utf-8")) if PARTIAL.exists() else None
+    # An unfinished run from today with the same questions and answers: ask only the questions that got no reply.
+    resume = bool(previous) and previous["date"] == date.today().isoformat() and \
+        [(r["question"], r["expected"]) for r in previous["results"]] == [(q["question"], q["answer"]) for q in questions]
+    report = previous if resume else evaluate(asker, questions, PROVIDERS[provider], pause=PAUSE)
+    for attempt in range(RETRIES + resume):  # busy free models often answer a minute later, so ask again
         missing = [i for i, r in enumerate(report["results"]) if "no_reply" in r]
         if not missing:
             break
-        time.sleep(60)
+        if attempt or not resume:
+            time.sleep(60)
         again = evaluate(asker, [questions[i] for i in missing], PROVIDERS[provider], pause=PAUSE)["results"]
         report = summary([dict(zip(missing, again)).get(i, r) for i, r in enumerate(report["results"])])
     for r in report["results"]:
@@ -106,11 +113,14 @@ def main() -> None:
         print(label + r["question"] + ("" if r["right"] else f"\n      {r.get('error') or r['sql']}"))
     if report["no_reply"]:
         answered = report["total"] - report["no_reply"]
+        PARTIAL.parent.mkdir(parents=True, exist_ok=True)
+        PARTIAL.write_text(json.dumps(report, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"\n{report['score']} of the {answered} answered questions were right, but {report['no_reply']} got no reply "
               f"from any model (busy or out of quota). That is not a full score, so docs/ask_eval.json was not written. "
-              f"Try again later; Gemini's free quota resets every day.")
+              f"Run this again later today and it asks only those {report['no_reply']}.")
         return
     OUT.write_text(json.dumps(report, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    PARTIAL.unlink(missing_ok=True)
     print(f"\n{report['score']} of {report['total']} right ({', '.join(report['models'])}); written to docs/ask_eval.json")
 
 

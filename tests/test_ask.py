@@ -252,6 +252,34 @@ def test_eval_counts_refused_answers_as_wrong_and_missing_replies_apart(asker, q
     assert any("refused" in r.get("error", "") and "no_reply" not in r for r in report["results"])
 
 
+def test_unfinished_run_is_kept_and_the_next_run_asks_only_the_missing_questions(questions, tmp_path, monkeypatch):
+    from pipeline import ask_eval
+    reference = {q["question"]: q["sql"] for q in questions}
+    monkeypatch.setattr(ask_eval, "load_key", lambda provider: None)
+    monkeypatch.setattr(ask_eval.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ask_eval, "PARTIAL", tmp_path / "partial.json")
+    monkeypatch.setattr(ask_eval, "OUT", tmp_path / "ask_eval.json")
+    monkeypatch.setattr(ask_eval.sys, "argv", ["ask_eval"])
+    asked = []
+
+    def busy_for_sbi(system, question):
+        asked.append(question)
+        if "SBI" in question:
+            raise RuntimeError("model busy")
+        return reference[question], "stand-in"
+
+    monkeypatch.setitem(ask_eval.PROVIDERS, "gemini", busy_for_sbi)
+    ask_eval.main()
+    assert ask_eval.PARTIAL.exists() and not ask_eval.OUT.exists()
+
+    asked.clear()
+    monkeypatch.setitem(ask_eval.PROVIDERS, "gemini", lambda system, question: (asked.append(question), (reference[question], "stand-in"))[1])
+    ask_eval.main()
+    assert all("SBI" in q for q in asked) and asked  # only the question that got no reply was asked again
+    report = json.loads(ask_eval.OUT.read_text(encoding="utf-8"))
+    assert (report["score"], report["no_reply"]) == (30, 0) and not ask_eval.PARTIAL.exists()
+
+
 @pytest.mark.parametrize("got, want, right", [
     ([["Punjab & Sind Bank", 4.98]], [["Punjab & Sind Bank", 4.98]], True),
     ([["punjab & sind bank", 4.98, 300.1]], [["Punjab & Sind Bank"]], True),  # extra columns are fine

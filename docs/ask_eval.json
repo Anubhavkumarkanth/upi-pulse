@@ -1,0 +1,553 @@
+{
+ "score": 30,
+ "total": 30,
+ "no_reply": 0,
+ "models": [
+  "gemini-3.1-flash-lite"
+ ],
+ "date": "2026-10-27",
+ "results": [
+  {
+   "question": "Which paying bank had the highest technical decline rate in October 2025?",
+   "right": true,
+   "sql": "SELECT bank AS bank_name, td_pct AS decline_rate FROM bank_month WHERE side = 'remitter' AND month = DATE '2025-10-01' ORDER BY td_pct DESC LIMIT 1",
+   "expected": [
+    [
+     "Punjab & Sind Bank"
+    ]
+   ],
+   "got": [
+    [
+     "Punjab & Sind Bank",
+     4.98
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What was State Bank of India's technical decline rate as a paying bank in September 2026?",
+   "right": true,
+   "sql": "SELECT td_pct AS tech_decline_rate FROM bank_month WHERE bank = 'State Bank of India' AND month = '2026-09-01' AND side = 'remitter'",
+   "expected": [
+    [
+     0.38
+    ]
+   ],
+   "got": [
+    [
+     0.38
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many paying banks kept technical declines under 1% in September 2026?",
+   "right": true,
+   "sql": "SELECT count(bank) AS bank_count FROM bank_month WHERE month = DATE '2026-09-01' AND side = 'remitter' AND td_pct < 1",
+   "expected": [
+    [
+     45
+    ]
+   ],
+   "got": [
+    [
+     45
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many paying banks kept technical declines under 1% in January 2022?",
+   "right": true,
+   "sql": "SELECT count(*) AS bank_count FROM bank_month WHERE month = DATE '2022-01-01' AND side = 'remitter' AND td_pct < 1.0",
+   "expected": [
+    [
+     24
+    ]
+   ],
+   "got": [
+    [
+     24
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which paying bank handled the most UPI payments in September 2026?",
+   "right": true,
+   "sql": "SELECT bank FROM bank_month WHERE month = DATE '2026-09-01' AND side = 'remitter' ORDER BY volume_mn DESC LIMIT 1",
+   "expected": [
+    [
+     "State Bank of India"
+    ]
+   ],
+   "got": [
+    [
+     "State Bank of India"
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many UPI payments, in millions, went through the top 50 paying banks in September 2026?",
+   "right": true,
+   "sql": "SELECT SUM(volume_mn) AS total_volume_mn FROM bank_month WHERE month = DATE '2026-09-01' AND side = 'remitter'",
+   "expected": [
+    [
+     26269.82
+    ]
+   ],
+   "got": [
+    [
+     26269.819999999992
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which receiving bank had the highest technical decline rate in September 2026?",
+   "right": true,
+   "sql": "SELECT bank AS bank, td_pct AS technical_decline_rate FROM bank_month WHERE side = 'beneficiary' AND month = DATE '2026-09-01' ORDER BY td_pct DESC LIMIT 1",
+   "expected": [
+    [
+     "Punjab & Sind Bank"
+    ]
+   ],
+   "got": [
+    [
+     "Punjab & Sind Bank",
+     1.54
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What was HDFC Bank's business decline rate as a paying bank in June 2023?",
+   "right": true,
+   "sql": "SELECT bd_pct AS decline_rate FROM bank_month WHERE bank = 'HDFC Bank' AND side = 'remitter' AND month = DATE '2023-06-01'",
+   "expected": [
+    [
+     3.49
+    ]
+   ],
+   "got": [
+    [
+     3.49
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which 3 paying banks had the highest business decline rates in August 2026?",
+   "right": true,
+   "sql": "SELECT bank, bd_pct AS decline_rate FROM bank_month WHERE side = 'remitter' AND month = DATE '2026-08-01' ORDER BY bd_pct DESC LIMIT 3",
+   "expected": [
+    [
+     "Airtel Payments Bank"
+    ],
+    [
+     "Fino Payments Bank"
+    ],
+    [
+     "NSDL Payments Bank"
+    ]
+   ],
+   "got": [
+    [
+     "Airtel Payments Bank",
+     26.58
+    ],
+    [
+     "Fino Payments Bank",
+     23.28
+    ],
+    [
+     "NSDL Payments Bank",
+     22.96
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "In which month did Airtel Payments Bank have its highest business decline rate as a paying bank?",
+   "right": true,
+   "sql": "SELECT month FROM bank_month WHERE bank = 'Airtel Payments Bank' AND side = 'remitter' ORDER BY bd_pct DESC LIMIT 1",
+   "expected": [
+    [
+     "2026-07-01"
+    ]
+   ],
+   "got": [
+    [
+     "2026-07-01"
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What was the technical decline rate across all top 50 paying banks in September 2026, weighted by payments?",
+   "right": true,
+   "sql": "SELECT SUM(td_pct * volume_mn) / SUM(volume_mn) AS avg_td_pct FROM bank_month WHERE side = 'remitter' AND month = DATE '2026-09-01'",
+   "expected": [
+    [
+     0.2568
+    ]
+   ],
+   "got": [
+    [
+     0.2568380940562212
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many payments banks were among the top 50 paying banks in September 2026?",
+   "right": true,
+   "sql": "SELECT count(DISTINCT bank) AS count_banks FROM bank_month WHERE month = DATE '2026-09-01' AND side = 'remitter' AND bank_type = 'payments bank'",
+   "expected": [
+    [
+     5
+    ]
+   ],
+   "got": [
+    [
+     5
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which public sector bank had the highest technical decline rate as a paying bank in December 2025?",
+   "right": true,
+   "sql": "SELECT bank, td_pct FROM bank_month WHERE side = 'remitter' AND bank_type = 'public sector bank' AND month = DATE '2025-12-01' ORDER BY td_pct DESC LIMIT 1",
+   "expected": [
+    [
+     "Punjab & Sind Bank"
+    ]
+   ],
+   "got": [
+    [
+     "Punjab & Sind Bank",
+     1.41
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What was ICICI Bank's technical decline rate as a paying bank over all of 2025, weighted by payments?",
+   "right": true,
+   "sql": "SELECT SUM(td_pct * volume_mn) / SUM(volume_mn) AS weighted_td_rate FROM bank_month WHERE bank = 'ICICI Bank' AND side = 'remitter' AND month >= '2025-01-01' AND month <= '2025-12-01'",
+   "expected": [
+    [
+     0.0865
+    ]
+   ],
+   "got": [
+    [
+     0.08647871434162963
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "In how many months was Bank of Baroda's technical decline rate as a paying bank above 1%?",
+   "right": true,
+   "sql": "SELECT count(*) AS months_above_1pct FROM bank_month WHERE bank = 'Bank of Baroda' AND side = 'remitter' AND td_pct > 1",
+   "expected": [
+    [
+     8
+    ]
+   ],
+   "got": [
+    [
+     8
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many different banks appear in the data?",
+   "right": true,
+   "sql": "SELECT count(DISTINCT bank) AS bank_count FROM bank_month",
+   "expected": [
+    [
+     76
+    ]
+   ],
+   "got": [
+    [
+     76
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What was the highest technical decline rate of any paying bank in 2022, and which bank and month was it?",
+   "right": true,
+   "sql": "SELECT td_pct AS highest_td_pct, bank AS bank_name, month AS month FROM bank_month WHERE side = 'remitter' AND YEAR(month) = 2022 ORDER BY td_pct DESC LIMIT 1",
+   "expected": [
+    [
+     "Maharashtra Gramin Bank",
+     "2022-09-01",
+     19.09
+    ]
+   ],
+   "got": [
+    [
+     19.09,
+     "Maharashtra Gramin Bank",
+     "2022-09-01"
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What were SBI's technical decline rates as a paying bank in August and September 2026?",
+   "right": true,
+   "sql": "SELECT month, td_pct FROM bank_month WHERE bank = 'State Bank of India' AND side = 'remitter' AND month IN (DATE '2026-08-01', DATE '2026-09-01')",
+   "expected": [
+    [
+     0.1
+    ],
+    [
+     0.38
+    ]
+   ],
+   "got": [
+    [
+     "2026-08-01",
+     0.1
+    ],
+    [
+     "2026-09-01",
+     0.38
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which small finance bank handled the most payments as a paying bank in September 2026?",
+   "right": true,
+   "sql": "SELECT bank, volume_mn FROM bank_month WHERE month = DATE '2026-09-01' AND side = 'remitter' AND bank_type = 'small finance bank' ORDER BY volume_mn DESC LIMIT 1",
+   "expected": [
+    [
+     "Slice Small Finance Bank"
+    ]
+   ],
+   "got": [
+    [
+     "Slice Small Finance Bank",
+     119.57
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many paying banks had a business decline rate above 10% in September 2026?",
+   "right": true,
+   "sql": "SELECT count(*) AS count FROM bank_month WHERE month = '2026-09-01' AND side = 'remitter' AND bd_pct > 10",
+   "expected": [
+    [
+     25
+    ]
+   ],
+   "got": [
+    [
+     25
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many UPI payments did Paytm Payments Bank receive in January 2022, in millions?",
+   "right": true,
+   "sql": "SELECT volume_mn FROM bank_month WHERE bank = 'Paytm Payments Bank' AND side = 'beneficiary' AND month = DATE '2022-01-01'",
+   "expected": [
+    [
+     957.4
+    ]
+   ],
+   "got": [
+    [
+     957.4
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What share of the top 50 paying banks' payments in September 2026 went through State Bank of India, in %?",
+   "right": true,
+   "sql": "SELECT SUM(CASE WHEN bank = 'State Bank of India' THEN volume_mn ELSE 0 END) * 100.0 / SUM(volume_mn) AS share_pct FROM bank_month WHERE month = '2026-09-01' AND side = 'remitter'",
+   "expected": [
+    [
+     25.6343
+    ]
+   ],
+   "got": [
+    [
+     25.63428299089983
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which month had the most UPI payments through the top 50 paying banks?",
+   "right": true,
+   "sql": "SELECT month, SUM(volume_mn) AS total_vol FROM bank_month WHERE side = 'remitter' GROUP BY month ORDER BY total_vol DESC LIMIT 1",
+   "expected": [
+    [
+     "2026-08-01"
+    ]
+   ],
+   "got": [
+    [
+     "2026-08-01",
+     26746.200000000004
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "What was the business decline rate across all top 50 paying banks in 2023, weighted by payments?",
+   "right": true,
+   "sql": "SELECT SUM(bd_pct * volume_mn) / SUM(volume_mn) AS avg_bd_rate FROM bank_month WHERE side = 'remitter' AND month >= DATE '2023-01-01' AND month <= DATE '2023-12-01'",
+   "expected": [
+    [
+     5.1512
+    ]
+   ],
+   "got": [
+    [
+     5.1512346987327176
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which paying banks had a technical decline rate of 1% or more in September 2026?",
+   "right": true,
+   "sql": "SELECT bank AS bank_name, td_pct AS technical_decline_rate FROM bank_month WHERE side = 'remitter' AND month = DATE '2026-09-01' AND td_pct >= 1.0",
+   "expected": [
+    [
+     "Punjab & Sind Bank"
+    ],
+    [
+     "Baroda UP Bank"
+    ],
+    [
+     "ESAF Small Finance Bank"
+    ],
+    [
+     "Maharashtra Gramin Bank"
+    ],
+    [
+     "NSDL Payments Bank"
+    ]
+   ],
+   "got": [
+    [
+     "Baroda UP Bank",
+     1.62
+    ],
+    [
+     "NSDL Payments Bank",
+     1.1
+    ],
+    [
+     "Punjab & Sind Bank",
+     1.86
+    ],
+    [
+     "Maharashtra Gramin Bank",
+     1.19
+    ],
+    [
+     "ESAF Small Finance Bank",
+     1.6
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "In which month was Kotak Mahindra Bank's technical decline rate as a paying bank at its highest?",
+   "right": true,
+   "sql": "SELECT month AS month FROM bank_month WHERE bank = 'Kotak Mahindra Bank' AND side = 'remitter' ORDER BY td_pct DESC LIMIT 1",
+   "expected": [
+    [
+     "2022-04-01"
+    ]
+   ],
+   "got": [
+    [
+     "2022-04-01"
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many regional rural banks were among the top 50 paying banks in September 2026?",
+   "right": true,
+   "sql": "SELECT COUNT(DISTINCT bank) AS bank_count FROM bank_month WHERE month = DATE '2026-09-01' AND side = 'remitter' AND bank_type = 'regional rural bank'",
+   "expected": [
+    [
+     8
+    ]
+   ],
+   "got": [
+    [
+     8
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "How many UPI payments did Airtel Payments Bank send in 2025, in millions?",
+   "right": true,
+   "sql": "SELECT SUM(volume_mn) AS total_volume FROM bank_month WHERE bank = 'Airtel Payments Bank' AND side = 'remitter' AND month >= DATE '2025-01-01' AND month <= DATE '2025-12-01'",
+   "expected": [
+    [
+     7249.6
+    ]
+   ],
+   "got": [
+    [
+     7249.599999999999
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Which type of bank had the highest technical decline rate among paying banks in September 2026, weighted by payments?",
+   "right": true,
+   "sql": "SELECT bank_type AS type, SUM(td_pct * volume_mn) / SUM(volume_mn) AS avg_td FROM bank_month WHERE side = 'remitter' AND month = DATE '2026-09-01' GROUP BY bank_type ORDER BY avg_td DESC LIMIT 1",
+   "expected": [
+    [
+     "regional rural bank"
+    ]
+   ],
+   "got": [
+    [
+     "regional rural bank",
+     0.7979964518267245
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  },
+  {
+   "question": "Mar 2024 mein sabse zyada business decline kis bank ka tha?",
+   "right": true,
+   "sql": "SELECT bank FROM bank_month WHERE month = DATE '2024-03-01' ORDER BY bd_pct DESC LIMIT 1",
+   "expected": [
+    [
+     "Fincare Small Finance Bank"
+    ]
+   ],
+   "got": [
+    [
+     "Fincare Small Finance Bank"
+    ]
+   ],
+   "model": "gemini-3.1-flash-lite"
+  }
+ ]
+}
