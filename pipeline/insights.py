@@ -5,7 +5,7 @@ and refuses the summary if it contains any number that is not in those facts. Wr
 Usage: python -m pipeline.insights [--provider gemini|claude]
   gemini (default): Google Gemini free tier, key in GEMINI_API_KEY (free from Google AI Studio)
   claude: Claude via the Anthropic API, key in ANTHROPIC_API_KEY (paid)
-Without the key in the environment, it asks for it at a hidden prompt.
+The key is read from the environment, else from ~/.gemini-key.txt (or ~/.claude-key.txt), else a hidden prompt.
 """
 import getpass
 import json
@@ -18,7 +18,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 MODEL = "claude-opus-5-5"
-GEMINI_MODEL = "gemini-3.8-flash"  # free tier on the Gemini API
+# All on the Gemini API's free tier, tried in order: busy free models answer 503/504, so the next one is used.
+GEMINI_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.1-flash-lite"]
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
           "November", "December"]
 NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -136,14 +137,20 @@ def ask_claude(fact_sheet: dict) -> tuple[str, str]:
 def ask_gemini(fact_sheet: dict) -> tuple[str, str]:
     """Returns (summary text, model that wrote it), from Google Gemini's free tier."""
     from google import genai  # only needed for a real run
+    from google.genai import errors, types
 
-    interaction = genai.Client().interactions.create(
-        model=GEMINI_MODEL,
-        system_instruction=SYSTEM,
-        input="FACTS:\n" + json.dumps(fact_sheet, indent=1),
-        generation_config={"thinking_level": "low"},  # a short summary of given figures needs little reasoning
-    )
-    return interaction.output_text.strip(), interaction.model or GEMINI_MODEL
+    # Keep a reference to the client (a temporary one closes its connection), and cap each attempt at 45 seconds.
+    client = genai.Client(http_options=types.HttpOptions(timeout=45_000))
+    tried = []
+    for model in GEMINI_MODELS:
+        try:
+            response = client.models.generate_content(
+                model=model, contents="FACTS:\n" + json.dumps(fact_sheet, indent=1),
+                config=types.GenerateContentConfig(system_instruction=SYSTEM))
+            return (response.text or "").strip(), response.model_version or model
+        except (errors.ServerError, errors.ClientError) as e:  # busy, timed out, out of quota or not offered to this key
+            tried.append(f"{model}: {e.code}")
+    raise RuntimeError("no Gemini model answered: " + "; ".join(tried))
 
 
 PROVIDERS = {"gemini": (ask_gemini, "GEMINI_API_KEY", "Gemini"), "claude": (ask_claude, "ANTHROPIC_API_KEY", "Anthropic")}
@@ -164,6 +171,9 @@ def write_insight(data: dict, ask=ask_gemini, out: Path = DOCS / "insight.json")
 def main() -> None:
     provider = sys.argv[sys.argv.index("--provider") + 1] if "--provider" in sys.argv else "gemini"
     ask, key_var, label = PROVIDERS[provider]
+    key_file = Path.home() / f".{provider}-key.txt"  # optional, made by the user in Notepad; outside the repository
+    if not os.environ.get(key_var) and key_file.exists():
+        os.environ[key_var] = key_file.read_text(encoding="utf-8-sig").strip()
     if not os.environ.get(key_var) and sys.stdin.isatty():
         # Typed by the person running this, hidden, and kept only in this process; never saved or printed.
         os.environ[key_var] = getpass.getpass(f"{label} API key (hidden, not saved): ").strip()

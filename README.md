@@ -64,7 +64,7 @@ NPCI API responses ──► pipeline/parse_npci.py ──► one table: bank ×
 - **Rates across banks** are weighted by each bank's number of payments, so they show what a typical payer experiences.
 - **AI monthly summary (`pipeline/insights.py`):**
   - **Facts first:** code works out the latest month's figures (this month against last month and a year ago, the highest failure rates, banks that crossed the 1% line, unusual months), already formatted as they should be written.
-  - **The model writes, code checks:** Google Gemini (free tier, `gemini-3.8-flash`) writes 3 or 4 sentences from those facts. Claude works too, with `--provider claude`.
+  - **The model writes, code checks:** Google Gemini's free tier writes 3 or 4 sentences from those facts. Free models are often busy, so it tries `gemini-3.8-flash`, then `gemini-3.6-flash`, then `gemini-3.1-flash-lite`, and the site names the model that wrote the summary. Claude works too, with `--provider claude`.
   - **Number check:** every number in the summary must appear among the figures. Quantity words such as "doubled" or "half", links, lists and text over 120 words are also refused. A refused summary is never written, and the site hides the panel when there is no summary for the latest month.
   - **Bad input:** bank names come from outside data, so they never count as allowed numbers. A test hides an instruction inside a bank name and checks that a model which obeys it cannot get anything published.
   - **On every push:** the tests re-check the published summary against the data.
