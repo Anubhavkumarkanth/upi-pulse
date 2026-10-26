@@ -22,6 +22,7 @@ from pipeline.insights import load_key
 QUESTIONS = Path(__file__).with_name("ask_questions.json")
 OUT = DATA.with_name("ask_eval.json")
 PAUSE = 10  # seconds between questions, to stay under the free tier's per-minute limit
+RETRIES = 2  # extra rounds for questions no model answered
 
 
 def norm(v):
@@ -71,6 +72,10 @@ def evaluate(asker: Asker, questions: list, write_sql, pause: float = 0) -> dict
                             "error": f"{type(e).__name__}: {e}"})
         if pause and i < len(questions) - 1:
             time.sleep(pause)
+    return summary(results)
+
+
+def summary(results: list) -> dict:
     models = sorted({r["model"] for r in results if "model" in r})
     return {"score": sum(r["right"] for r in results), "total": len(results), "no_reply": sum("no_reply" in r for r in results),
             "models": models, "date": date.today().isoformat(), "results": results}
@@ -89,6 +94,13 @@ def main() -> None:
     provider = sys.argv[sys.argv.index("--provider") + 1] if "--provider" in sys.argv else "gemini"
     load_key(provider)
     report = evaluate(asker, questions, PROVIDERS[provider], pause=PAUSE)
+    for _ in range(RETRIES):  # busy free models often answer a minute later, so ask the unanswered questions again
+        missing = [i for i, r in enumerate(report["results"]) if "no_reply" in r]
+        if not missing:
+            break
+        time.sleep(60)
+        again = evaluate(asker, [questions[i] for i in missing], PROVIDERS[provider], pause=PAUSE)["results"]
+        report = summary([dict(zip(missing, again)).get(i, r) for i, r in enumerate(report["results"])])
     for r in report["results"]:
         label = "right " if r["right"] else "NO REPLY " if r.get("no_reply") else "WRONG "
         print(label + r["question"] + ("" if r["right"] else f"\n      {r.get('error') or r['sql']}"))

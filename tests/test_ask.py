@@ -243,9 +243,10 @@ def test_eval_counts_refused_answers_as_wrong_and_missing_replies_apart(asker, q
         return ("DROP TABLE bank_month", "stand-in") if "2022" in question else (TOP_OCT_2025, "stand-in")
 
     report = evaluate(asker, questions, flaky)
-    right = [r["question"] for r in report["results"] if r["right"]]
-    # The stand-in always answers October 2025's top bank, which is right for the one question that asks it.
-    assert right == ["Which paying bank had the highest technical decline rate in October 2025?"]
+    right = [r for r in report["results"] if r["right"]]
+    # The stand-in always answers October 2025's top bank, so it is right only where that bank is the known answer.
+    assert "Which paying bank had the highest technical decline rate in October 2025?" in [r["question"] for r in right]
+    assert all(r["expected"] == [["Punjab & Sind Bank"]] for r in right)
     # A busy model is a missing reply, counted apart so an incomplete run is never published as a score.
     assert report["no_reply"] == sum("SBI" in q["question"] for q in questions) > 0
     assert any("refused" in r.get("error", "") and "no_reply" not in r for r in report["results"])

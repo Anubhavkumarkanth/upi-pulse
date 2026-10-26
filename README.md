@@ -101,11 +101,11 @@ with `ASK_PROVIDER=claude`. The model writes only the query; the numbers and nam
 Accuracy is measured on 30 test questions whose answers were worked out from the data (`pipeline/ask_questions.json`),
 and the tests check those answers again on every push. `python -m pipeline.ask_eval` puts the questions to the model. An
 answer counts as right when it has the same rows as the known answer, with the same names, months and numbers (to within
-0.1%). A run in which some questions get no reply from the model is not published, since a missing reply says nothing
-about accuracy.
+0.1%). The known answer holds only what the question asks for, so an answer may add columns. A run in which some
+questions get no reply from the model is not published, since a missing reply says nothing about accuracy.
 
-Latest score: not measured yet. In the first run, on 27 October 2026, the free models answered 15 of the 30 questions and
-got all 15 right; the other 15 got no reply because the free quota had run out.
+Latest score: not measured yet. On 27 October 2026, Gemini's free quota ran out before all 30 questions got a reply. In
+the second run, 20 got a reply and all 20 were right.
 
 The service is a small FastAPI app on Render's free plan (`render.yaml`), and it holds the API key. The free plan sleeps
 after 15 quiet minutes, so the first question can take up to a minute. The page says so, and nothing else on it depends
