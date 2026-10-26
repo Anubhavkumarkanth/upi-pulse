@@ -115,42 +115,51 @@ def problems(text: str, fact_sheet: dict) -> list:
     return found
 
 
-def ask_claude(fact_sheet: dict) -> tuple[str, str]:
-    """Returns (summary text, model that wrote it)."""
+def claude_text(system: str, user: str) -> tuple[str, str]:
+    """Returns (reply text, model that wrote it). Shared by the monthly summary and pipeline/ask.py."""
     import anthropic  # only needed for a real run; the tests pass their own `ask`
 
-    response = anthropic.Anthropic().beta.messages.create(
+    response = anthropic.Anthropic(timeout=60).beta.messages.create(
         model=MODEL,
         max_tokens=16000,
-        system=SYSTEM,
-        output_config={"effort": "low"},  # a short summary of given figures needs little reasoning
+        system=system,
+        output_config={"effort": "low"},  # short replies from given figures or a given table need little reasoning
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",  # if the model declines, the API retries on a fallback model in the same call
-        messages=[{"role": "user", "content": "FACTS:\n" + json.dumps(fact_sheet, indent=1)}],
+        messages=[{"role": "user", "content": user}],
     )
     if response.stop_reason != "end_turn":
-        raise RuntimeError(f"no summary: stop reason {response.stop_reason} (request {response._request_id})")
+        raise RuntimeError(f"no reply: stop reason {response.stop_reason} (request {response._request_id})")
     text = " ".join(b.text for b in response.content if b.type == "text").strip()
     return text, response.model
 
 
-def ask_gemini(fact_sheet: dict) -> tuple[str, str]:
-    """Returns (summary text, model that wrote it), from Google Gemini's free tier."""
+def ask_claude(fact_sheet: dict) -> tuple[str, str]:
+    """Returns (summary text, model that wrote it)."""
+    return claude_text(SYSTEM, "FACTS:\n" + json.dumps(fact_sheet, indent=1))
+
+
+def gemini_text(system: str, user: str, timeout: int = 45) -> tuple[str, str]:
+    """Returns (reply text, model that wrote it), from Google Gemini's free tier. Shared with pipeline/ask.py."""
     from google import genai  # only needed for a real run
     from google.genai import errors, types
 
-    # Keep a reference to the client (a temporary one closes its connection), and cap each attempt at 45 seconds.
-    client = genai.Client(http_options=types.HttpOptions(timeout=45_000))
+    # Keep a reference to the client (a temporary one closes its connection), and cap each attempt at `timeout` seconds.
+    client = genai.Client(http_options=types.HttpOptions(timeout=timeout * 1000))
     tried = []
     for model in GEMINI_MODELS:
         try:
             response = client.models.generate_content(
-                model=model, contents="FACTS:\n" + json.dumps(fact_sheet, indent=1),
-                config=types.GenerateContentConfig(system_instruction=SYSTEM))
+                model=model, contents=user, config=types.GenerateContentConfig(system_instruction=system))
             return (response.text or "").strip(), response.model_version or model
         except (errors.ServerError, errors.ClientError) as e:  # busy, timed out, out of quota or not offered to this key
             tried.append(f"{model}: {e.code}")
     raise RuntimeError("no Gemini model answered: " + "; ".join(tried))
+
+
+def ask_gemini(fact_sheet: dict) -> tuple[str, str]:
+    """Returns (summary text, model that wrote it), from Google Gemini's free tier."""
+    return gemini_text(SYSTEM, "FACTS:\n" + json.dumps(fact_sheet, indent=1))
 
 
 PROVIDERS = {"gemini": (ask_gemini, "GEMINI_API_KEY", "Gemini"), "claude": (ask_claude, "ANTHROPIC_API_KEY", "Anthropic")}
@@ -168,16 +177,21 @@ def write_insight(data: dict, ask=ask_gemini, out: Path = DOCS / "insight.json")
     return insight
 
 
-def main() -> None:
-    provider = sys.argv[sys.argv.index("--provider") + 1] if "--provider" in sys.argv else "gemini"
-    ask, key_var, label = PROVIDERS[provider]
+def load_key(provider: str) -> None:
+    """Put the provider's key in the environment if it is not there: from ~/.{provider}-key.txt, else a hidden prompt."""
+    _, key_var, label = PROVIDERS[provider]
     key_file = Path.home() / f".{provider}-key.txt"  # optional, made by the user in Notepad; outside the repository
     if not os.environ.get(key_var) and key_file.exists():
         os.environ[key_var] = key_file.read_text(encoding="utf-8-sig").strip()
     if not os.environ.get(key_var) and sys.stdin.isatty():
         # Typed by the person running this, hidden, and kept only in this process; never saved or printed.
         os.environ[key_var] = getpass.getpass(f"{label} API key (hidden, not saved): ").strip()
-    insight = write_insight(json.loads((DOCS / "data.json").read_text(encoding="utf-8")), ask=ask)
+
+
+def main() -> None:
+    provider = sys.argv[sys.argv.index("--provider") + 1] if "--provider" in sys.argv else "gemini"
+    load_key(provider)
+    insight = write_insight(json.loads((DOCS / "data.json").read_text(encoding="utf-8")), ask=PROVIDERS[provider][0])
     print(f"docs/insight.json written by {insight['model']} for {month_name(insight['month'])}:\n{insight['text']}")
 
 

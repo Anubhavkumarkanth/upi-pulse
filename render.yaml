@@ -1,0 +1,15 @@
+# Render blueprint for the "ask the data" service, on the free plan (it sleeps after 15 idle minutes).
+# The model key is typed into Render's dashboard when the service is created (sync: false), never stored here.
+services:
+  - type: web
+    name: upi-pulse-ask
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: GEMINI_API_KEY
+        sync: false

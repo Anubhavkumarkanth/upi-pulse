@@ -109,6 +109,15 @@ input[type="number"] { width: 9em; }
 .error { color: var(--bad); font-size: 0.88rem; }
 .notes { display: grid; gap: 10px; font-size: 0.92rem; color: var(--ink-2); }
 .notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.askrow { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: end; }
+.askrow label { flex: 1 1 280px; }
+input[type="text"] { font: inherit; font-size: 0.95rem; padding: 8px 10px; border: 1px solid var(--axis); border-radius: 7px; background: var(--surface); color: var(--ink); width: 100%; }
+.btn { font: inherit; font-weight: 600; padding: 8px 20px; border: 0; border-radius: 7px; background: var(--accent); color: var(--on-accent); cursor: pointer; }
+.btn:disabled { opacity: 0.6; cursor: progress; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; font-size: 0.85rem; }
+.chip { font: inherit; font-size: 0.82rem; padding: 3px 10px; border: 1px solid var(--axis); border-radius: 999px; background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.answer { font-size: 1.5rem; font-weight: 600; line-height: 1.25; max-width: none; }
+pre.sql { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-radius: 8px; font-size: 0.82rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 720px) { .calc { grid-template-columns: 1fr; } .bar { grid-template-columns: 1fr; } .tile .value { font-size: 1.7rem; } }
 @media (prefers-reduced-motion: no-preference) { .seg button, tbody tr { transition: background-color 0.12s; } }
 </style>
@@ -140,6 +149,30 @@ input[type="number"] { width: 9em; }
     <div class="card">
       <p id="summary-text"></p>
       <p class="small muted" id="summary-note"></p>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-ask">
+    <div class="sechead">
+      <h2 id="h-ask">Ask the data</h2>
+      <p class="muted">Ask about these banks and months in your own words. An AI model turns your question into a database
+        query, code runs it, and the answer below comes straight from the data, with the query shown.</p>
+    </div>
+    <div class="card">
+      <form id="ask-form" class="askrow">
+        <label class="field" for="ask-q">Your question
+          <input type="text" id="ask-q" maxlength="300" autocomplete="off" placeholder="Which bank had the most technical declines in Oct 2025?"></label>
+        <button type="submit" class="btn" id="ask-btn">Ask</button>
+      </form>
+      <div class="chips" id="ask-examples"><span class="muted">Try:</span></div>
+      <p class="small muted" id="ask-status" aria-live="polite"></p>
+      <div id="ask-result" hidden>
+        <p class="answer" id="ask-answer"></p>
+        <div class="tablewrap" id="ask-table"></div>
+        <details><summary>The query that was run</summary><pre class="sql" id="ask-sql"></pre></details>
+      </div>
+      <p class="small muted" id="ask-note">The model only writes the query, never the numbers. Before it runs, code checks
+        that it is one read-only query on this page's table and nothing else.</p>
     </div>
   </section>
 
@@ -530,6 +563,49 @@ input[type="number"] { width: 9em; }
     document.getElementById("summary-section").hidden = false;
   }
 
+  // Ask the data: a small service on Render writes and runs the query. Its free plan sleeps when idle, so the first
+  // question can take up to a minute, and nothing else on the page depends on it.
+  const ASK_API = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "http://localhost:8000" : "https://upi-pulse-ask.onrender.com";
+  const ASK_EXAMPLES = ["Which bank had the most technical declines in Oct 2025?", "How many paying banks were under 1% in Sep 2026?", "What was SBI's business decline rate in June 2023?"];
+  const askCell = (v, col) => typeof v === "number" ? v.toLocaleString("en-IN", { maximumFractionDigits: 2 }) + (/pct$/.test(col) ? "%" : "")
+    : v == null ? "–" : /^\d{4}-\d{2}-01$/.test(v) ? MONTHS[+v.slice(5, 7) - 1] + " " + v.slice(0, 4) : v;
+
+  function showAnswer(a) {
+    const rows = a.rows.map(r => r.map((v, i) => askCell(v, a.columns[i])));
+    document.getElementById("ask-answer").textContent = !rows.length ? "No rows match this question." : rows.length === 1 ? rows[0].join(" · ")
+      : a.truncated ? `The first ${rows.length} rows` : `${rows.length} rows`;
+    table(document.getElementById("ask-table"), a.columns.map(c => c.replace(/_/g, " ")), rows,
+      a.columns.map((_, i) => i).filter(i => a.rows.some(r => typeof r[i] === "number")));
+    document.getElementById("ask-sql").textContent = `${a.sql}\n\n-- written by ${a.model}`;
+    document.getElementById("ask-result").hidden = false;
+  }
+
+  function setupAsk() {
+    const form = document.getElementById("ask-form"), input = document.getElementById("ask-q"), btn = document.getElementById("ask-btn");
+    const status = (text, isError) => { const s = document.getElementById("ask-status"); s.textContent = text; s.className = "small " + (isError ? "error" : "muted"); };
+    input.addEventListener("focus", () => fetch(ASK_API + "/health").catch(() => {}), { once: true });  // wakes a sleeping service early
+    ASK_EXAMPLES.forEach(q => { const b = el("button", { type: "button", class: "chip" }, q);
+      b.addEventListener("click", () => { input.value = q; form.requestSubmit(); }); document.getElementById("ask-examples").append(b); });
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) { input.focus(); return; }
+      btn.disabled = true; document.getElementById("ask-result").hidden = true; status("Working on it…");
+      const slow = setTimeout(() => status("Waking up the question service. On its free plan this can take up to a minute."), 5000);
+      const ctl = new AbortController(), stop = setTimeout(() => ctl.abort(), 90000);
+      try {
+        const r = await fetch(ASK_API + "/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }), signal: ctl.signal });
+        const body = await r.json().catch(() => ({}));
+        if (r.ok) { showAnswer(body); status(""); }
+        else status(typeof body.detail === "string" ? body.detail : "That question could not be answered. Try wording it differently.", true);
+      } catch {
+        status("The question service is not answering right now. It may be asleep or down, so try again in a minute. Everything else on this page still works.", true);
+      } finally { clearTimeout(slow); clearTimeout(stop); btn.disabled = false; }
+    });
+    fetch("ask_eval.json").then(r => r.ok ? r.json() : null).then(ev => { if (ev) document.getElementById("ask-note").textContent +=
+      ` On ${ev.total} test questions with known answers, it got ${ev.score} right (${ev.models.join(", ")}, ${ev.date}).`; }).catch(() => {});
+  }
+
   function renderSide() {
     document.querySelectorAll("#side-toggle button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.side === state.side)));
     document.getElementById("side-note").textContent = SIDE_NOTE[state.side];
@@ -552,6 +628,7 @@ input[type="number"] { width: 9em; }
     new MutationObserver(() => renderSide()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   }
 
+  setupAsk();
   fetch("data.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(start).catch(err => {
     document.querySelector(".wrap").append(el("p", { class: "error" }, "The data file did not load (" + err.message + "). Reload the page to try again."));
   });

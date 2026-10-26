@@ -26,6 +26,7 @@ These figures are for paying banks (the customer's bank that sends the money):
 
 - **Latest month:** the headline numbers.
 - **This month in plain English:** a short summary written by an AI model, with every number checked against the data before it is published.
+- **Ask the data:** type a question in your own words. An AI model turns it into a database query, code runs it, and the answer comes straight from the data, with the query shown.
 - **Trends:** technical and business declines over time, with the 1% line.
 - **Who drove the rise:** each bank's share of the rise in business declines.
 - **Bank scoreboard:** every top-50 bank, sortable, with a 12-month mini-chart.
@@ -68,6 +69,15 @@ NPCI API responses ──► pipeline/parse_npci.py ──► one table: bank ×
   - **Number check:** every number in the summary must appear among the figures. Quantity words such as "doubled" or "half", links, lists and text over 120 words are also refused. A refused summary is never written, and the site hides the panel when there is no summary for the latest month.
   - **Bad input:** bank names come from outside data, so they never count as allowed numbers. A test hides an instruction inside a bank name and checks that a model which obeys it cannot get anything published.
   - **On every push:** the tests re-check the published summary against the data.
+- **Ask the data (`pipeline/ask.py`, `api/main.py`):**
+  - **The model writes only the query:** Gemini's free tier (the same models as the summary) turns the question into one SQL query. Claude works too, with `ASK_PROVIDER=claude`. Every number and name in the answer comes from running that query, never from the model.
+  - **Code checks the query:** DuckDB parses it, and it must be a single SELECT that reads only the `bank_month` table. File readers, system tables, lists of typed-in values and second statements are refused.
+  - **The database is locked anyway:** it lives in memory and holds only the rows the site shows. It cannot read files or reach the network, its settings cannot be changed back, and a query returns at most 200 rows and is stopped after 5 seconds.
+  - **The answer is checked too:** every piece of text in it must be a bank name, bank type or month from the data, so the model cannot slip its own words into an answer.
+  - **Questions are untrusted:** anyone can type anything. The tests hand the code a model that obeys "ignore your rules" and check that nothing it writes gets through.
+  - **Limits:** 8 questions a minute and 50 a day for each visitor, and 300 a day for everyone, so the free model quota (or a paid key's bill) stays small.
+  - **Accuracy:** 30 test questions with answers worked out from the data (`pipeline/ask_questions.json`), checked again by the tests on every push. `python -m pipeline.ask_eval` puts them to the model. An answer counts as right when it has the same rows as the known answer, with the same names, months and numbers (to within 0.1%). A run where the model gives no reply to some questions is not published, because it would measure Gemini's free quota, not accuracy. **Latest score:** not measured yet. In the first run, on 27 October 2026, the free models answered 15 of the 30 questions and got all 15 right; the other 15 got no reply because the free quota had run out.
+  - **Where it runs:** a small FastAPI service on Render's free plan (`render.yaml`) holds the API key. The free plan sleeps after 15 quiet minutes, so the first question can take up to a minute. The page says so, and nothing else on it depends on the service.
 
 ## Data sources
 
@@ -90,6 +100,9 @@ python pipeline/parse_npci.py                   # builds data/processed/
 pytest -q                                       # data, analysis and site checks
 python -m pipeline.build_site                   # rebuilds docs/
 python -m pipeline.insights                     # AI summary; asks for a free Gemini key if none is set
+python -m pipeline.ask "Which bank had the most technical declines in Oct 2025?"
+python -m pipeline.ask_eval                     # scores the model on the 30 test questions
+uvicorn api.main:app --port 8000                # the question service; needs GEMINI_API_KEY in the environment
 ```
 
 Without the Time Series of India file, the pipeline builds only NPCI's own months, and the checks that need that file skip. On GitHub Actions, the tests run on every push.
@@ -101,8 +114,8 @@ Without the Time Series of India file, the pipeline builds only NPCI's own month
 - **Missing columns:** for the months filled from the copy, approval rates, debit reversals and UDIR figures are not available yet. They will come from NPCI's own files.
 
 - **AI summary:** it restates the month's figures and does not explain causes. On Gemini's free tier, what is sent may be used to improve Google's products. Only NPCI's public figures are sent.
+- **Ask the data:** the model can misread a question, and the score above shows how often. The query is always shown, so an answer can be checked. Only the table's layout, the bank names and the question are sent to the model, and on Gemini's free tier they may be used to improve Google's products.
 
 ## Planned next
 
-- **Plain-English questions:** ask the data in your own words, with a test set of known answers.
 - **UPI failure tests for Orderdesk:** UPI failure scenarios for my [Orderdesk](https://github.com/Anubhavkumarkanth/orderdesk-qa-suite) QA project.
