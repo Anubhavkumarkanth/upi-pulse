@@ -135,6 +135,14 @@ input[type="number"] { width: 9em; }
     <div class="tiles" id="tiles"></div>
   </section>
 
+  <section aria-labelledby="h-summary" id="summary-section" hidden>
+    <div class="sechead"><h2 id="h-summary">This month in plain English</h2></div>
+    <div class="card">
+      <p id="summary-text"></p>
+      <p class="small muted" id="summary-note"></p>
+    </div>
+  </section>
+
   <section aria-labelledby="h-td">
     <div class="sechead">
       <h2 id="h-td">Technical declines keep falling</h2>
@@ -508,9 +516,18 @@ input[type="number"] { width: 9em; }
       "The 1% line is RBI's reported ask to NPCI, from press reports. It is not a published rule.",
       "NPCI published August 2022's debit reversal success rates without the decimal point (9123.00% for 91.23%). The pipeline corrects that month; the raw file is kept as published.",
       "The shop calculator adds your customers' banks' rate and your own bank's receiving rate. That is an approximation from monthly averages, not a model of single payments.",
+      "The monthly summary, when shown, is written by Claude from this page's figures. Code checks every number in it against the data and refuses to publish a summary that contains any other number.",
       `Built ${D.meta.built}. Data checks run before every build.`,
     ].forEach(t => ul.append(el("li", {}, t)));
     box.append(ul);
+  }
+
+  // The AI summary is optional: shown only when insight.json exists and is for the latest month.
+  function renderSummary(ins) {
+    if (!ins || ins.month !== D.meta.months[lastM()]) return;
+    document.getElementById("summary-text").textContent = ins.text;
+    document.getElementById("summary-note").textContent = `Written by Claude (${ins.model}) from the figures on this page, ${ins.generated}. Before it was published, an automatic check confirmed that every number in it appears in the data.`;
+    document.getElementById("summary-section").hidden = false;
   }
 
   function renderSide() {
@@ -528,6 +545,7 @@ input[type="number"] { width: 9em; }
     document.querySelectorAll("#side-toggle button").forEach(b => b.addEventListener("click", () => { state.side = b.dataset.side; renderSide(); }));
     document.getElementById("type-filter").addEventListener("change", e => { state.type = e.target.value; renderBoard(); });
     renderSide(); renderDrivers(); renderCalc(); renderNotes();
+    fetch("insight.json").then(r => r.ok ? r.json() : null).then(renderSummary).catch(() => {});
     let w = document.querySelector(".wrap").clientWidth;
     new ResizeObserver(() => { const nw = document.querySelector(".wrap").clientWidth; if (Math.abs(nw - w) > 20) { w = nw; renderTrends(); renderCompare(); } }).observe(document.querySelector(".wrap"));
     matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderSide(); });
