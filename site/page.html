@@ -1,0 +1,541 @@
+<title>UPI Pulse</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="How reliably UPI payments go through at each of India's top 50 banks, month by month, from NPCI's published data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column of stacked sections under a single filter row; tables scroll inside their own box. */
+:root {
+  --bg: #f5f7fa; --surface: #ffffff; --ink: #0f1722; --ink-2: #485263; --muted: #7a8494;
+  --rule: #e2e6ed; --axis: #c5ccd6; --accent: #1f5fbf; --accent-wash: #e8f0fb; --on-accent: #ffffff;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --good: #0f7a0f; --good-wash: #e5f4e5; --bad: #c23232; --bad-wash: #fbe9e9; --warn-wash: #fff4dc; --warn: #8a5a00;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1117; --surface: #161a22; --ink: #eef1f6; --ink-2: #b7bfcc; --muted: #8a93a3;
+  --rule: #262c37; --axis: #3a4250; --accent: #6ea8f0; --accent-wash: #1a2740; --on-accent: #0e1117;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --good: #3fbf3f; --good-wash: #15301a; --bad: #f07272; --bad-wash: #3a1a1c; --warn-wash: #33290f; --warn: #f0c060;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1117; --surface: #161a22; --ink: #eef1f6; --ink-2: #b7bfcc; --muted: #8a93a3;
+  --rule: #262c37; --axis: #3a4250; --accent: #6ea8f0; --accent-wash: #1a2740; --on-accent: #0e1117;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --good: #3fbf3f; --good-wash: #15301a; --bad: #f07272; --bad-wash: #3a1a1c; --warn-wash: #33290f; --warn: #f0c060;
+  color-scheme: dark;
+}
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 40px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.05; }
+h2 { font-size: 1.45rem; line-height: 1.2; }
+h3 { font-size: 1rem; margin: 0; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--accent); }
+.eyebrow { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.lede { font-size: 1.08rem; color: var(--ink-2); }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+header { display: grid; gap: 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 0; border-block: 1px solid var(--rule); }
+.seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 0.9rem; padding: 7px 14px; border: 0; background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--axis); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+button:focus-visible, select:focus-visible, input:focus-visible, svg:focus-visible, summary:focus-visible, th button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+section { display: grid; gap: 16px; }
+.sechead { display: grid; gap: 6px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.tile .label { font-size: 0.85rem; color: var(--ink-2); }
+.tile .value { font-size: 2rem; font-weight: 600; line-height: 1.1; }
+.tile .delta { font-size: 0.85rem; color: var(--muted); }
+.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.chart { position: relative; min-width: 0; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font: 11px var(--body); }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--axis); border-radius: 8px;
+  padding: 8px 10px; font-size: 0.82rem; box-shadow: 0 4px 14px rgba(0,0,0,0.12); min-width: 150px; z-index: 2; }
+.tip .when { color: var(--muted); margin-bottom: 4px; }
+.tip .row { display: flex; align-items: center; gap: 8px; }
+.tip .row b { font-variant-numeric: tabular-nums; }
+.tip .key { width: 14px; height: 2px; border-radius: 1px; flex: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 16px; height: 2px; border-radius: 1px; display: inline-block; }
+.legend i.dash { height: 0; border-top: 1.5px dashed var(--ink-2); }
+details summary { cursor: pointer; color: var(--accent); font-size: 0.88rem; }
+.tablewrap { overflow-x: auto; max-height: 420px; overflow-y: auto; border: 1px solid var(--rule); border-radius: 8px; margin-top: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--surface); color: var(--ink-2); font-weight: 600; z-index: 1; }
+td.num, th.num { text-align: right; }
+th button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+tbody tr:hover { background: var(--accent-wash); }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+.pill.good { background: var(--good-wash); color: var(--good); }
+.pill.bad { background: var(--bad-wash); color: var(--bad); }
+.pill.warn { background: var(--warn-wash); color: var(--warn); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+label.field { display: grid; gap: 4px; font-size: 0.82rem; color: var(--ink-2); }
+select, input[type="number"] { font: inherit; font-size: 0.92rem; padding: 6px 8px; border: 1px solid var(--axis); border-radius: 7px; background: var(--surface); color: var(--ink); min-width: 0; }
+input[type="number"] { width: 9em; }
+.bars { display: grid; gap: 10px; }
+.bar { display: grid; grid-template-columns: minmax(120px, 210px) 1fr; gap: 4px 14px; align-items: center; }
+.bar .name { font-size: 0.9rem; }
+.bar .name small { display: block; color: var(--muted); font-size: 0.78rem; }
+.bar .track { position: relative; height: 22px; }
+.bar .fill { position: absolute; left: 0; top: 4px; height: 14px; background: var(--s1); border-radius: 0 4px 4px 0; }
+.bar .val { position: absolute; top: 1px; font-size: 0.85rem; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.calc { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; }
+.calc fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.calc legend { font-weight: 600; margin-bottom: 4px; }
+.mixrow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.mixrow select { flex: 1 1 180px; }
+.mixrow input { width: 6em; }
+.radio { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.92rem; }
+.result { background: var(--accent-wash); border-radius: 10px; padding: 16px; display: grid; gap: 12px; align-content: start; }
+.result .big { font-size: 2.2rem; font-weight: 600; line-height: 1.1; }
+.result dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 0.9rem; }
+.result dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.error { color: var(--bad); font-size: 0.88rem; }
+.notes { display: grid; gap: 10px; font-size: 0.92rem; color: var(--ink-2); }
+.notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+@media (max-width: 720px) { .calc { grid-template-columns: 1fr; } .bar { grid-template-columns: 1fr; } .tile .value { font-size: 1.7rem; } }
+@media (prefers-reduced-motion: no-preference) { .seg button, tbody tr { transition: background-color 0.12s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">UPI reliability tracker · NPCI data, Jan 2022 to <span id="last-month">Sep 2026</span></div>
+    <h1>UPI Pulse</h1>
+    <p class="lede">How often UPI payments fail at India's 50 busiest banks, month by month. A technical decline means the bank's
+      or the network's systems failed. A business decline is a normal "no", like a wrong PIN or a low balance.</p>
+  </header>
+
+  <div class="filters" role="group" aria-label="Which banks">
+    <span class="small muted">Show</span>
+    <div class="seg" id="side-toggle">
+      <button type="button" data-side="remitter" aria-pressed="true">Paying banks</button>
+      <button type="button" data-side="beneficiary" aria-pressed="false">Receiving banks</button>
+    </div>
+    <span class="small muted" id="side-note">The payer's bank, which sends the money.</span>
+  </div>
+
+  <section aria-labelledby="h-now">
+    <div class="sechead"><h2 id="h-now">Latest month</h2></div>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section aria-labelledby="h-td">
+    <div class="sechead">
+      <h2 id="h-td">Technical declines keep falling</h2>
+      <p id="td-text" class="muted"></p>
+    </div>
+    <div class="card">
+      <div class="legend"><span><i style="background: var(--s1)"></i>All top-50 banks, weighted by payments</span><span><i class="dash"></i>1% line</span></div>
+      <div class="chart" id="td-chart"></div>
+      <details><summary>Show as table</summary><div class="tablewrap" id="td-table"></div></details>
+    </div>
+    <p class="small muted" id="festive-text"></p>
+  </section>
+
+  <section aria-labelledby="h-bd">
+    <div class="sechead">
+      <h2 id="h-bd">Business declines are rising</h2>
+      <p class="muted" id="bd-text"></p>
+    </div>
+    <div class="card">
+      <div class="chart" id="bd-chart"></div>
+      <details><summary>Show as table</summary><div class="tablewrap" id="bd-table"></div></details>
+    </div>
+    <div class="card">
+      <h3>Which paying banks drove the rise</h3>
+      <p class="small muted" id="drivers-text"></p>
+      <div class="bars" id="drivers"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-board">
+    <div class="sechead">
+      <h2 id="h-board">Bank scoreboard</h2>
+      <p class="muted" id="board-text"></p>
+    </div>
+    <div class="toolbar">
+      <label class="field" for="type-filter">Bank type
+        <select id="type-filter"><option value="">All types</option></select>
+      </label>
+    </div>
+    <div class="tablewrap" id="board"></div>
+  </section>
+
+  <section aria-labelledby="h-compare">
+    <div class="sechead">
+      <h2 id="h-compare">Compare banks</h2>
+      <p class="muted">Technical decline rate, month by month. Pick up to three banks.</p>
+    </div>
+    <div class="toolbar" id="compare-pickers"></div>
+    <div class="card">
+      <div class="legend" id="compare-legend"></div>
+      <div class="chart" id="compare-chart"></div>
+      <details><summary>Show as table</summary><div class="tablewrap" id="compare-table"></div></details>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-alerts">
+    <div class="sechead">
+      <h2 id="h-alerts">Unusual months</h2>
+      <p class="muted" id="alerts-text"></p>
+    </div>
+    <div class="tablewrap" id="alerts"></div>
+  </section>
+
+  <section aria-labelledby="h-calc">
+    <div class="sechead">
+      <h2 id="h-calc">What this means for a shop</h2>
+      <p class="muted">Estimate how many of your UPI payments fail each month, from the last 12 months of bank averages.
+        Change the numbers to match your shop.</p>
+    </div>
+    <div class="card calc">
+      <form id="calc-form" novalidate>
+        <fieldset>
+          <label class="field" for="c-count">UPI payments you receive per month
+            <input type="number" id="c-count" min="0" step="100" value="3000"></label>
+          <label class="field" for="c-avg">Average payment (₹)
+            <input type="number" id="c-avg" min="0" step="10" value="450"></label>
+          <div>
+            <div class="legend" style="margin-bottom:6px; color: var(--ink)"><b>Your customers' banks</b></div>
+            <div class="radio">
+              <label><input type="radio" name="c-mix" id="c-mix-india" value="india" checked> Typical India mix</label>
+              <label><input type="radio" name="c-mix" id="c-mix-own" value="own"> Your own mix</label>
+            </div>
+          </div>
+          <div id="c-own" hidden></div>
+          <label class="field" for="c-recv">Your bank, which receives the money
+            <select id="c-recv"></select></label>
+        </fieldset>
+      </form>
+      <div class="result" aria-live="polite" id="calc-result"></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-notes">
+    <div class="sechead"><h2 id="h-notes">Sources and method</h2></div>
+    <div class="notes" id="notes"></div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const SIDE_NOTE = { remitter: "The payer's bank, which sends the money.", beneficiary: "The payee's bank, which receives the money." };
+  const SIDE_NAME = { remitter: "paying banks", beneficiary: "receiving banks" };
+  const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+  let D, state = { side: "remitter", type: "", sort: { key: "vol", dir: -1 }, compare: {} };
+
+  const el = (tag, attrs = {}, text) => { const e = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
+  const svg = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+  const monthName = i => { const [y, m] = D.meta.months[i].split("-"); return MONTHS[+m - 1] + " " + y; };
+  const pct = (v, d = 2) => v == null ? "–" : v.toFixed(d) + "%";
+  const bank = i => D.banks[i];
+  const cap = s => s[0].toUpperCase() + s.slice(1);
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  // Axis: a clean tick step (1, 2, 2.5 or 5 times a power of ten) and as many ticks as the data needs.
+  function axis(max) {
+    const raw = Math.max(max, 0.01) / 4, p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map(s => s * p).find(s => s >= raw), ticks = Math.ceil(max / step);
+    const dec = Math.max(0, -Math.floor(Math.log10(step) + 1e-9)) + (String(step / p).includes(".") ? 1 : 0);
+    return { step, ticks, max: step * ticks, fmt: v => v.toFixed(dec) + "%" };
+  }
+
+  // Line chart: series = [{name, color, values: [y or null per month]}]. One y-axis, hairline grid, crosshair tooltip.
+  function lineChart(host, { series, target, yFmt = v => v.toFixed(1) + "%", area = false, endLabels = false }) {
+    host.replaceChildren();
+    const n = D.meta.months.length, W = Math.max(300, host.clientWidth || 600), H = Math.round(Math.min(300, Math.max(200, W * 0.36)));
+    const all = series.flatMap(s => s.values).filter(v => v != null);
+    const ax = axis(Math.max(...all, target || 0) * 1.05), ymax = ax.max;
+    const labelW = endLabels && W > 560 ? 150 : 0;
+    const m = { t: 12, r: 12 + labelW, b: 26, l: 40 };
+    const x = i => m.l + i * (W - m.l - m.r) / (n - 1), y = v => m.t + (1 - v / ymax) * (H - m.t - m.b);
+    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", tabindex: "0", "aria-label": series.map(s => s.name).join(", ") + " by month. Use left and right arrow keys to read values." });
+    for (let k = 0; k <= ax.ticks; k++) {
+      const v = ax.step * k, yy = y(v);
+      s.append(svg("line", { x1: m.l, x2: W - m.r, y1: yy, y2: yy, stroke: k ? css("--rule") : css("--axis"), "stroke-width": 1 }));
+      const t = svg("text", { x: m.l - 6, y: yy + 4, "text-anchor": "end" }); t.textContent = ax.fmt(v); s.append(t);
+    }
+    D.meta.months.forEach((mm, i) => { if (mm.endsWith("-01-01")) { const t = svg("text", { x: x(i), y: H - 6, "text-anchor": "middle" }); t.textContent = mm.slice(0, 4); s.append(t); } });
+    if (target != null) {
+      s.append(svg("line", { x1: m.l, x2: W - m.r, y1: y(target), y2: y(target), stroke: css("--ink-2"), "stroke-width": 1.5, "stroke-dasharray": "5 4" }));
+    }
+    const ends = [];
+    series.forEach(se => {
+      let d = "", started = false, last = null;
+      se.values.forEach((v, i) => { if (v == null) { started = false; return; } d += (started ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); started = true; last = i; });
+      if (area && last != null) {
+        const first = se.values.findIndex(v => v != null);
+        s.append(svg("path", { d: d + `L${x(last)} ${y(0)}L${x(first)} ${y(0)}Z`, fill: se.color, "fill-opacity": 0.1, stroke: "none" }));
+      }
+      s.append(svg("path", { d, fill: "none", stroke: se.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+      if (last != null) {
+        s.append(svg("circle", { cx: x(last), cy: y(se.values[last]), r: 4, fill: se.color, stroke: css("--surface"), "stroke-width": 2 }));
+        ends.push({ y: y(se.values[last]), x: x(last), text: se.name + " " + yFmt(se.values[last]) });
+      }
+    });
+    // End labels only when they don't collide; the legend and tooltip carry identity otherwise.
+    if (labelW) {
+      const ys = ends.map(e => e.y).sort((a, b) => a - b);
+      if (ys.every((v, i) => i === 0 || v - ys[i - 1] >= 14)) ends.forEach(e => { const t = svg("text", { x: e.x + 8, y: e.y + 4 }); t.style.fill = css("--ink-2"); t.textContent = e.text; s.append(t); });
+    }
+    const cross = svg("line", { y1: m.t, y2: H - m.b, stroke: css("--axis"), "stroke-width": 1, visibility: "hidden" });
+    s.append(cross);
+    const hit = svg("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" });
+    s.append(hit);
+    host.append(s);
+    const tip = el("div", { class: "tip", hidden: "" }); host.append(tip);
+    let cur = n - 1;
+    const show = i => {
+      cur = Math.max(0, Math.min(n - 1, i));
+      cross.setAttribute("x1", x(cur)); cross.setAttribute("x2", x(cur)); cross.setAttribute("visibility", "visible");
+      tip.replaceChildren(el("div", { class: "when" }, monthName(cur)));
+      series.forEach(se => { const r = el("div", { class: "row" }); const k = el("span", { class: "key" }); k.style.background = se.color;
+        r.append(k, el("b", {}, se.values[cur] == null ? "–" : yFmt(se.values[cur])), el("span", { class: "muted" }, se.name)); tip.append(r); });
+      tip.hidden = false;
+      const scale = host.clientWidth / W, px = x(cur) * scale;
+      tip.style.left = Math.min(Math.max(0, px + 12), host.clientWidth - tip.offsetWidth) + "px";
+      tip.style.top = "8px";
+    };
+    const hide = () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); };
+    s.addEventListener("pointermove", e => { const r = s.getBoundingClientRect(); show(Math.round(((e.clientX - r.left) * W / r.width - m.l) / ((W - m.l - m.r) / (n - 1)))); });
+    s.addEventListener("pointerleave", hide);
+    s.addEventListener("focus", () => show(cur));
+    s.addEventListener("blur", hide);
+    s.addEventListener("keydown", e => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); show(cur + (e.key === "ArrowLeft" ? -1 : 1)); } });
+  }
+
+  function table(host, head, rows, numCols = []) {
+    const t = el("table"), tr = el("tr");
+    head.forEach((h, i) => tr.append(el("th", numCols.includes(i) ? { class: "num", scope: "col" } : { scope: "col" }, h)));
+    const tb = el("tbody");
+    rows.forEach(r => { const row = el("tr"); r.forEach((c, i) => { const td = el("td", numCols.includes(i) ? { class: "num" } : {}); if (c instanceof Node) td.append(c); else td.textContent = c; row.append(td); }); tb.append(row); });
+    t.append(el("thead"), tb); t.tHead.append(tr); host.replaceChildren(t);
+  }
+
+  const summary = () => D.summary[state.side];
+  const rows = () => D.rows[state.side];
+  const lastM = () => D.meta.months.length - 1;
+  function seriesFor(b, key = 3) { const v = new Array(D.meta.months.length).fill(null); rows().forEach(r => { if (r[1] === b) v[r[0]] = r[key]; }); return v; }
+
+  function renderTiles() {
+    const s = summary(), now = s[s.length - 1], yearAgo = s.find(r => r.m === now.m - 12), start = s[0];
+    const tiles = [
+      ["Technical declines", pct(now.td), yearAgo ? `${pct(yearAgo.td)} a year earlier` : ""],
+      ["Banks under the 1% line", `${now.under} of ${now.banks}`, `${start.under} in ${monthName(start.m)}`],
+      ["Business declines", pct(now.bd), yearAgo ? `${pct(yearAgo.bd)} a year earlier` : ""],
+      ["Payments in the month", (now.vol / 1000).toFixed(1) + " bn", `${now.top5.toFixed(0)}% through the 5 busiest banks`],
+    ];
+    document.getElementById("tiles").replaceChildren(...tiles.map(([l, v, d]) => {
+      const t = el("div", { class: "tile" }); t.append(el("div", { class: "label" }, l), el("div", { class: "value" }, v), el("div", { class: "delta" }, d)); return t; }));
+  }
+
+  function renderTrends() {
+    const s = summary(), n = D.meta.months.length, td = new Array(n).fill(null), bd = new Array(n).fill(null);
+    s.forEach(r => { td[r.m] = r.td; bd[r.m] = r.bd; });
+    lineChart(document.getElementById("td-chart"), { series: [{ name: "Technical declines", color: css("--s1"), values: td }], target: D.meta.td_target, area: true, yFmt: v => v.toFixed(v < 1 ? 2 : 1) + "%" });
+    lineChart(document.getElementById("bd-chart"), { series: [{ name: "Business declines", color: css("--s2"), values: bd }], area: true });
+    const first = s[0], now = s[s.length - 1];
+    document.getElementById("td-text").textContent = `Across the top 50 ${SIDE_NAME[state.side]}, ${pct(now.td)} of payments failed for a technical reason in ${monthName(now.m)}, down from ${pct(first.td)} in ${monthName(first.m)}. That is about 1 in ${inr.format(Math.round(100 / now.td))} payments.`;
+    document.getElementById("bd-text").textContent = `Business declines went from ${pct(first.bd)} to ${pct(now.bd)} of payments over the same period. These are declines for reasons like a wrong PIN, a low balance or a daily limit, so nothing broke, but the payment still did not go through.`;
+    const tableRows = s.map(r => [monthName(r.m), pct(r.td), pct(r.bd), `${r.under} of ${r.banks}`, inr.format(Math.round(r.vol)), r.src === "npci" ? "NPCI" : "Time Series of India"]);
+    for (const id of ["td-table", "bd-table"]) table(document.getElementById(id), ["Month", "Technical", "Business", "Under 1%", "Payments (mn)", "Copy used"], tableRows, [1, 2, 3, 4]);
+    const f = D.festive.filter(r => r.side === state.side);
+    document.getElementById("festive-text").textContent = f.length ? "October and November, the festive season, ran lower than the rest of the year: " +
+      f.map(r => `${r.year} ${pct(r.festive)} against ${pct(r.other)}`).join("; ") + "." : "";
+  }
+
+  function renderDrivers() {
+    const dr = D.drivers, top = dr.rows.slice(0, 8), rest = dr.rows.slice(8).reduce((a, r) => a + r.c, 0);
+    document.getElementById("drivers-text").textContent = `Business declines at paying banks rose ${dr.change.toFixed(2)} points, from the 2024 average to the last 12 months (${monthName(D.meta.months.indexOf(D.meta.last12[0]))} to ${monthName(lastM())}). Each bar is one bank's share of that rise: its own decline rate going up, weighted by how many payments it handles.`;
+    const max = Math.max(...top.map(r => r.c));
+    const items = top.map(r => {
+      const row = el("div", { class: "bar" }), name = el("div", { class: "name" }, bank(r.b).n);
+      name.append(el("small", {}, `${pct(r.bd0, 1)} → ${pct(r.bd1, 1)} declined · ${r.s1.toFixed(1)}% of payments`));
+      const track = el("div", { class: "track" }), fill = el("div", { class: "fill" }), w = Math.max(1, r.c / max * 78);
+      fill.style.width = w + "%"; const val = el("span", { class: "val" }, `+${r.c.toFixed(2)} pts`); val.style.left = `calc(${w}% + 8px)`;
+      track.append(fill, val); row.append(name, track); return row; });
+    const other = el("p", { class: "small muted" }, `All other banks together: ${rest >= 0 ? "+" : ""}${rest.toFixed(2)} points. Total: +${dr.change.toFixed(2)} points.`);
+    document.getElementById("drivers").replaceChildren(...items, other);
+  }
+
+  function spark(values) {
+    const W = 84, H = 22, pts = values.map((v, i) => [i, v]).filter(p => p[1] != null);
+    const s = svg("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, "aria-hidden": "true" });
+    if (pts.length < 2) return s;
+    const max = Math.max(1, ...pts.map(p => p[1])), x = i => 2 + i * (W - 6) / 11, y = v => H - 3 - v / max * (H - 6);
+    s.append(svg("line", { x1: 0, x2: W, y1: y(1), y2: y(1), stroke: css("--axis"), "stroke-width": 1, "stroke-dasharray": "2 2" }));
+    s.append(svg("path", { d: pts.map((p, k) => (k ? "L" : "M") + x(p[0]).toFixed(1) + " " + y(p[1]).toFixed(1)).join(""), fill: "none", stroke: css("--s1"), "stroke-width": 1.5 }));
+    const l = pts[pts.length - 1]; s.append(svg("circle", { cx: x(l[0]), cy: y(l[1]), r: 2.5, fill: css("--s1") }));
+    return s;
+  }
+
+  function statusPill(td) {
+    const ok = td < D.meta.td_target;
+    return el("span", { class: "pill " + (ok ? "good" : "bad") }, ok ? "✓ Under 1%" : "✕ Over 1%");
+  }
+
+  function renderBoard() {
+    const L = lastM(), cur = rows().filter(r => r[0] === L && (!state.type || bank(r[1]).t === state.type));
+    const hist = {}; rows().forEach(r => { if (r[0] > L - 12) (hist[r[1]] ||= new Array(12).fill(null))[r[0] - (L - 11)] = r[3]; });
+    const key = { bank: r => bank(r[1]).n, type: r => bank(r[1]).t, vol: r => r[2], td: r => r[3], bd: r => r[4] }[state.sort.key];
+    cur.sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0) * state.sort.dir);
+    const all = rows().filter(r => r[0] === L), under = all.filter(r => r[3] < D.meta.td_target).length;
+    document.getElementById("board-text").textContent = `All top-50 ${SIDE_NAME[state.side]} in ${monthName(L)}. ${under} of ${all.length} kept technical declines under 1%. The small chart shows each bank's last 12 months, with the dotted 1% line.`;
+    const cols = [["bank", "Bank"], ["type", "Type"], ["vol", "Payments (mn)"], ["td", "Technical"], [null, "1% line"], ["bd", "Business"], [null, "Last 12 months"]];
+    const t = el("table"), head = el("tr");
+    cols.forEach(([k, label], i) => {
+      const th = el("th", { scope: "col", class: [2, 3, 5].includes(i) ? "num" : "" });
+      if (k) { const b = el("button", { type: "button" }, label + (state.sort.key === k ? (state.sort.dir > 0 ? " ↑" : " ↓") : ""));
+        th.setAttribute("aria-sort", state.sort.key === k ? (state.sort.dir > 0 ? "ascending" : "descending") : "none");
+        b.addEventListener("click", () => { state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : (k === "bank" || k === "type" ? 1 : -1) }; renderBoard(); }); th.append(b); }
+      else th.textContent = label;
+      head.append(th); });
+    const tb = el("tbody");
+    cur.forEach(r => { const tr = el("tr"); const b = bank(r[1]);
+      [b.n, cap(b.t), inr.format(Math.round(r[2])), pct(r[3]), statusPill(r[3]), pct(r[4]), spark(hist[r[1]] || [])].forEach((c, i) => {
+        const td = el("td", [2, 3, 5].includes(i) ? { class: "num" } : {}); if (c instanceof Node) td.append(c); else td.textContent = c; tr.append(td); });
+      tb.append(tr); });
+    t.append(el("thead"), tb); t.tHead.append(head);
+    document.getElementById("board").replaceChildren(t);
+  }
+
+  const DEFAULT_COMPARE = { remitter: ["statebankofindia", "hdfcbank", "airtelpaymentsbank"], beneficiary: ["statebankofindia", "hdfcbank", "paytmpaymentsbank"] };
+  function renderCompare() {
+    const present = [...new Set(rows().map(r => r[1]))].sort((a, b) => bank(a).n.localeCompare(bank(b).n));
+    const byKey = Object.fromEntries(present.map(i => [bank(i).k, i]));
+    if (!state.compare[state.side]) state.compare[state.side] = DEFAULT_COMPARE[state.side].map(k => byKey[k] ?? "").slice(0, 3);
+    const chosen = state.compare[state.side];
+    const pickers = document.getElementById("compare-pickers"); pickers.replaceChildren();
+    const colors = ["--s1", "--s2", "--s3"];
+    chosen.forEach((b, slot) => {
+      const id = "cmp-" + slot, lab = el("label", { class: "field", for: id }, `Bank ${slot + 1}`), sel = el("select", { id });
+      sel.append(el("option", { value: "" }, "None"));
+      present.forEach(i => { const o = el("option", { value: i }, bank(i).n); if (i === b) o.selected = true; sel.append(o); });
+      sel.addEventListener("change", () => { chosen[slot] = sel.value === "" ? "" : +sel.value; renderCompare(); });
+      lab.append(sel); pickers.append(lab); });
+    const series = chosen.map((b, slot) => b === "" ? null : { name: bank(b).n, color: css(colors[slot]), values: seriesFor(b) }).filter(Boolean);
+    const legend = document.getElementById("compare-legend"); legend.replaceChildren();
+    series.forEach(se => { const sp = el("span"); const i = el("i"); i.style.background = se.color; sp.append(i, document.createTextNode(se.name)); legend.append(sp); });
+    const dl = el("span"); dl.append(el("i", { class: "dash" }), document.createTextNode("1% line")); legend.append(dl);
+    if (series.length) lineChart(document.getElementById("compare-chart"), { series, target: D.meta.td_target, endLabels: true });
+    else document.getElementById("compare-chart").replaceChildren(el("p", { class: "muted" }, "Pick a bank above to see its line."));
+    table(document.getElementById("compare-table"), ["Month", ...series.map(s => s.name)],
+      D.meta.months.map((_, i) => [monthName(i), ...series.map(s => pct(s.values[i]))]), series.map((_, i) => i + 1));
+  }
+
+  function renderAlerts() {
+    const a = D.alerts.filter(r => r.side === state.side), r = D.meta.alert_rule;
+    document.getElementById("alerts-text").textContent = `A month is flagged when a bank's technical decline rate is at least ${r.min_rise} point above its own usual level (the median of its previous 12 months) and far outside its normal ups and downs: ${r.z} or more robust standard deviations. ${a.length} bank-months among ${SIDE_NAME[state.side]} meet both since 2022; the latest 15 are below. This is plain statistics, with no AI model involved.`;
+    table(document.getElementById("alerts"), ["Month", "Bank", "Technical", "Usual", "Times its normal swing", ""],
+      a.slice(0, 15).map(x => [monthName(x.m), bank(x.b).n, pct(x.td), pct(x.usual), `${x.z.toFixed(1)}×`, el("span", { class: "pill warn" }, "! Unusual")]), [2, 3, 4]);
+  }
+
+  // Shop calculator: expected failures = payments x (customers' banks' weighted rate + your bank's receiving rate).
+  function renderCalc() {
+    const send = D.calculator.remitter, recv = D.calculator.beneficiary;
+    const recvSel = document.getElementById("c-recv");
+    if (!recvSel.options.length) {
+      recv.slice().sort((a, b) => bank(a.b).n.localeCompare(bank(b.b).n)).forEach(r => { const o = el("option", { value: r.b }, bank(r.b).n); if (bank(r.b).k === "hdfcbank") o.selected = true; recvSel.append(o); });
+      const own = document.getElementById("c-own"), defaults = [["statebankofindia", 40], ["hdfcbank", 20], ["icicibank", 15], ["airtelpaymentsbank", 10]];
+      own.style.display = "grid"; own.style.gap = "8px";
+      defaults.forEach(([k, share], i) => {
+        const row = el("div", { class: "mixrow" }), sel = el("select", { id: "c-bank-" + i, "aria-label": `Customer bank ${i + 1}` });
+        send.slice().sort((a, b) => bank(a.b).n.localeCompare(bank(b.b).n)).forEach(r => { const o = el("option", { value: r.b }, bank(r.b).n); if (bank(r.b).k === k) o.selected = true; sel.append(o); });
+        const inp = el("input", { type: "number", id: "c-share-" + i, min: 0, max: 100, step: 1, value: share, "aria-label": `Share of customers at bank ${i + 1} (%)` });
+        row.append(sel, inp, el("span", { class: "small muted" }, "%")); own.append(row); });
+      own.append(el("p", { class: "small muted", id: "c-rest" }));
+      document.getElementById("calc-form").addEventListener("input", renderCalc);
+      document.getElementById("calc-form").addEventListener("change", renderCalc);
+    }
+    const ownMode = document.getElementById("c-mix-own").checked;
+    document.getElementById("c-own").hidden = !ownMode;
+    const count = Math.max(0, +document.getElementById("c-count").value || 0), avg = Math.max(0, +document.getElementById("c-avg").value || 0);
+    const net = { td: send.reduce((a, r) => a + r.share * r.td, 0) / 100, bd: send.reduce((a, r) => a + r.share * r.bd, 0) / 100 };
+    let sendTd = net.td, sendBd = net.bd, error = "";
+    if (ownMode) {
+      let used = 0; sendTd = 0; sendBd = 0;
+      for (let i = 0; i < 4; i++) {
+        const b = +document.getElementById("c-bank-" + i).value, share = Math.max(0, +document.getElementById("c-share-" + i).value || 0), r = send.find(x => x.b === b);
+        used += share; sendTd += share * r.td / 100; sendBd += share * r.bd / 100; }
+      const rest = 100 - used;
+      if (rest < 0) error = "Your shares add up to more than 100%. Lower one of them.";
+      else { sendTd += rest * net.td / 100; sendBd += rest * net.bd / 100; }
+      document.getElementById("c-rest").textContent = rest >= 0 ? `The other ${rest.toFixed(0)}% are counted at the all-bank average.` : "";
+    }
+    const recvRow = recv.find(x => x.b === +document.getElementById("c-recv").value);
+    const out = document.getElementById("calc-result");
+    if (error) { out.replaceChildren(el("p", { class: "error" }, error)); return; }
+    const techRate = sendTd + recvRow.td, tech = count * techRate / 100, biz = count * sendBd / 100;
+    out.replaceChildren(
+      el("div", { class: "small muted" }, "Expected technical failures per month"),
+      el("div", { class: "big" }, inr.format(Math.round(tech))),
+      el("p", { class: "small" }, techRate > 0 ? `About 1 in ${inr.format(Math.round(100 / techRate))} payments, worth about ₹${inr.format(Math.round(tech * avg))} a month in payments that do not go through the first time.` : "")
+    );
+    const dl = el("dl");
+    [["From your customers' banks", pct(sendTd)], ["From your bank, receiving", pct(recvRow.td)], ["Business declines, customer side", `${inr.format(Math.round(biz))} (${pct(sendBd)})`]]
+      .forEach(([k, v]) => dl.append(el("dt", {}, k), el("dd", {}, v)));
+    out.append(dl, el("p", { class: "small muted" }, `Rates are 12-month averages (${monthName(D.meta.months.indexOf(D.meta.last12[0]))} to ${monthName(lastM())}). Real months swing above and below, and some customers retry and succeed.`));
+  }
+
+  function renderNotes() {
+    const src = D.meta.sources, fmt = arr => arr.length ? `${monthName(D.meta.months.indexOf(arr[0]))} to ${monthName(D.meta.months.indexOf(arr[arr.length - 1]))}` : "none";
+    const npciRem = src.remitter.npci, tsoiRem = src.remitter.tsoi;
+    const box = document.getElementById("notes"); box.replaceChildren();
+    box.append(el("p", {}, "Source of all figures: National Payments Corporation of India (NPCI), UPI Ecosystem Statistics, Top 50 Member Performance. The data belongs to NPCI."));
+    const ul = el("ul");
+    [
+      `Paying banks: NPCI's own files for ${fmt(npciRem.filter(m => m < "2025"))} and ${monthName(D.meta.months.indexOf(npciRem[npciRem.length - 1]))}. ${fmt(tsoiRem)} comes from Time Series of India's copy of the same NPCI data, used while NPCI's site was down. Receiving banks: all months from that copy.`,
+      "Where both copies exist, every bank's technical and business decline rates match exactly. The copy has no approval, debit reversal or UDIR figures, so this page uses only volumes and decline rates.",
+      "Rates across banks are weighted by each bank's number of payments, so they show what a typical payer experiences.",
+      "The 1% line is RBI's reported ask to NPCI, from press reports. It is not a published rule.",
+      "NPCI published August 2022's debit reversal success rates without the decimal point (9123.00% for 91.23%). The pipeline corrects that month; the raw file is kept as published.",
+      "The shop calculator adds your customers' banks' rate and your own bank's receiving rate. That is an approximation from monthly averages, not a model of single payments.",
+      `Built ${D.meta.built}. Data checks run before every build.`,
+    ].forEach(t => ul.append(el("li", {}, t)));
+    box.append(ul);
+  }
+
+  function renderSide() {
+    document.querySelectorAll("#side-toggle button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.side === state.side)));
+    document.getElementById("side-note").textContent = SIDE_NOTE[state.side];
+    const types = [...new Set(rows().map(r => bank(r[1]).t))].sort(), sel = document.getElementById("type-filter");
+    if (!types.includes(state.type)) state.type = "";
+    sel.replaceChildren(el("option", { value: "" }, "All types"), ...types.map(t => { const o = el("option", { value: t }, cap(t)); if (t === state.type) o.selected = true; return o; }));
+    renderTiles(); renderTrends(); renderBoard(); renderCompare(); renderAlerts();
+  }
+
+  function start(data) {
+    D = data;
+    document.getElementById("last-month").textContent = monthName(lastM());
+    document.querySelectorAll("#side-toggle button").forEach(b => b.addEventListener("click", () => { state.side = b.dataset.side; renderSide(); }));
+    document.getElementById("type-filter").addEventListener("change", e => { state.type = e.target.value; renderBoard(); });
+    renderSide(); renderDrivers(); renderCalc(); renderNotes();
+    let w = document.querySelector(".wrap").clientWidth;
+    new ResizeObserver(() => { const nw = document.querySelector(".wrap").clientWidth; if (Math.abs(nw - w) > 20) { w = nw; renderTrends(); renderCompare(); } }).observe(document.querySelector(".wrap"));
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderSide(); });
+    new MutationObserver(() => renderSide()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }
+
+  fetch("data.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(start).catch(err => {
+    document.querySelector(".wrap").append(el("p", { class: "error" }, "The data file did not load (" + err.message + "). Reload the page to try again."));
+  });
+})();
+</script>
