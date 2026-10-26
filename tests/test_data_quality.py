@@ -2,9 +2,12 @@
 import pandas as pd
 import pytest
 
-from pipeline.parse_npci import ALIASES, PUBLIC_SECTOR, bank_key, bank_type, build, display_name, number, tsoi_rows
+from pipeline.parse_npci import ALIASES, PUBLIC_SECTOR, TSOI, bank_key, bank_type, build, display_name, number, tsoi_rows
 
-PCT = ["approved_pct", "bd_pct", "td_pct", "debit_reversal_success_pct", "udir_auto_update_sr_pct", "udir_refund_sr_pct"]
+# The Time Series of India copy stays on the author's machine (data/raw/tsoi is not in git), so checks of it skip elsewhere.
+needs_tsoi = pytest.mark.skipif(not any(TSOI.glob("bank-performance_*.json")),
+                                reason="Time Series of India copy not present (kept local, not in git)")
+PCT =["approved_pct", "bd_pct", "td_pct", "debit_reversal_success_pct", "udir_auto_update_sr_pct", "udir_refund_sr_pct"]
 
 
 @pytest.fixture(scope="module")
@@ -81,6 +84,7 @@ def test_aug_2022_debit_reversal_fix(df):
     assert sbi.debit_reversal_success_pct == pytest.approx(91.23)
 
 
+@needs_tsoi
 def test_tsoi_copy_matches_npci():
     # Two copies of the same NPCI data must agree wherever both have a bank-month.
     npci = build().query("source == 'npci'")
@@ -92,6 +96,7 @@ def test_tsoi_copy_matches_npci():
     assert set(zip(off.side, off.month, off.bank_key)) == {("remitter", "2024-07-01", "ausmallfinancebank")}, off
 
 
+@needs_tsoi
 @pytest.mark.parametrize("bank, volume, bd, td", [
     ("ausmallfinancebank", 44.585, 0.62, 0.11),
     ("airtelpaymentsbank", 590.913, 3.9, 0.04),
@@ -102,6 +107,7 @@ def test_beneficiary_spot_check_against_dataful_preview(df, bank, volume, bd, td
     assert row.volume_mn == pytest.approx(volume, abs=0.06) and row.bd_pct == pytest.approx(bd) and row.td_pct == pytest.approx(td)
 
 
+@needs_tsoi
 def test_no_missing_months(df):
     for side in ("remitter", "beneficiary"):
         months = pd.to_datetime(df[df.side == side].month)
