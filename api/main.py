@@ -33,7 +33,8 @@ class Question(BaseModel):
 
 
 def visitor(request: Request) -> str:
-    # shortcut: trusts the first X-Forwarded-For address, which a client can fake; the all-visitor daily cap still holds
+    # A client can fake the first X-Forwarded-For address, so this per-visitor limit is best effort. The daily cap for
+    # everyone still holds.
     return request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
 
 

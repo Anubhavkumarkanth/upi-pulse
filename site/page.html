@@ -171,8 +171,8 @@ pre.sql { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-rad
         <div class="tablewrap" id="ask-table"></div>
         <details><summary>The query that was run</summary><pre class="sql" id="ask-sql"></pre></details>
       </div>
-      <p class="small muted" id="ask-note">The model only writes the query, never the numbers. Before it runs, code checks
-        that it is one read-only query on this page's table and nothing else.</p>
+      <p class="small muted" id="ask-note">The model only writes the query; the numbers come from the data. Before the query
+        runs, code checks that it is one read-only query on this page's table.</p>
     </div>
   </section>
 

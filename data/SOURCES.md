@@ -1,6 +1,6 @@
 # Data sources
 
-**Source of all figures: National Payments Corporation of India (NPCI)**, UPI Ecosystem Statistics, "Top 50 Member
+All figures come from the National Payments Corporation of India (NPCI): UPI Ecosystem Statistics, "Top 50 Member
 Performance" (remitter and beneficiary banks, monthly): https://www.npci.org.in/product/ecosystem-statistics/upi.
 The data belongs to NPCI.
 
@@ -13,8 +13,8 @@ How each month got here (the `source` column of `bank_month` says which):
 
 Checks on the `tsoi` copy (`tests/test_data_quality.py`):
 
-- **Match with NPCI:** on all 35 months where both copies exist, every bank's BD % and TD % match NPCI's file exactly, and volumes agree to 0.1 million.
-- **The one difference:** for Jul 2024, Time Series of India merges AU Small Finance Bank's two entries into one row.
+- On all 35 months where both copies exist, every bank's BD % and TD % match NPCI's file exactly, and volumes agree to 0.1 million.
+- The only difference is Jul 2024, where Time Series of India merges AU Small Finance Bank's two entries into one row.
 
 Correction to NPCI's own data: in Aug 2022, NPCI published every bank's debit reversal success % without its decimal
 point ("9123.00%" for 91.23%). The pipeline divides that month by 100; the raw file is unchanged.
