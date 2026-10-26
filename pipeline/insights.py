@@ -1,17 +1,24 @@
-"""Monthly plain-English summary, written by Claude from the computed figures, with a check on every number.
+"""Monthly plain-English summary, written by an AI model from the computed figures, with a check on every number.
 
-Reads docs/data.json (what the site shows), computes the latest month's facts, asks Claude for a short summary,
+Reads docs/data.json (what the site shows), computes the latest month's facts, asks a model for a short summary,
 and refuses the summary if it contains any number that is not in those facts. Writes docs/insight.json.
-Usage: python -m pipeline.insights     (needs ANTHROPIC_API_KEY, or an `ant auth login` profile)
+Usage: python -m pipeline.insights [--provider gemini|claude]
+  gemini (default): Google Gemini free tier, key in GEMINI_API_KEY (free from Google AI Studio)
+  claude: Claude via the Anthropic API, key in ANTHROPIC_API_KEY (paid)
+Without the key in the environment, it asks for it at a hidden prompt.
 """
+import getpass
 import json
+import os
 import re
+import sys
 from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 MODEL = "claude-opus-5-5"
+GEMINI_MODEL = "gemini-3.8-flash"  # free tier on the Gemini API
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
           "November", "December"]
 NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -101,7 +108,23 @@ def ask_claude(fact_sheet: dict) -> tuple[str, str]:
     return text, response.model
 
 
-def write_insight(data: dict, ask=ask_claude, out: Path = DOCS / "insight.json") -> dict:
+def ask_gemini(fact_sheet: dict) -> tuple[str, str]:
+    """Returns (summary text, model that wrote it), from Google Gemini's free tier."""
+    from google import genai  # only needed for a real run
+
+    interaction = genai.Client().interactions.create(
+        model=GEMINI_MODEL,
+        system_instruction=SYSTEM,
+        input="FACTS:\n" + json.dumps(fact_sheet, indent=1),
+        generation_config={"thinking_level": "low"},  # a short summary of given figures needs little reasoning
+    )
+    return interaction.output_text.strip(), interaction.model or GEMINI_MODEL
+
+
+PROVIDERS = {"gemini": (ask_gemini, "GEMINI_API_KEY", "Gemini"), "claude": (ask_claude, "ANTHROPIC_API_KEY", "Anthropic")}
+
+
+def write_insight(data: dict, ask=ask_gemini, out: Path = DOCS / "insight.json") -> dict:
     """Ask for a summary, check every number against the facts, and write it only if it passes."""
     fact_sheet = facts(data)
     text, model = ask(fact_sheet)
@@ -114,7 +137,12 @@ def write_insight(data: dict, ask=ask_claude, out: Path = DOCS / "insight.json")
 
 
 def main() -> None:
-    insight = write_insight(json.loads((DOCS / "data.json").read_text(encoding="utf-8")))
+    provider = sys.argv[sys.argv.index("--provider") + 1] if "--provider" in sys.argv else "gemini"
+    ask, key_var, label = PROVIDERS[provider]
+    if not os.environ.get(key_var) and sys.stdin.isatty():
+        # Typed by the person running this, hidden, and kept only in this process; never saved or printed.
+        os.environ[key_var] = getpass.getpass(f"{label} API key (hidden, not saved): ").strip()
+    insight = write_insight(json.loads((DOCS / "data.json").read_text(encoding="utf-8")), ask=ask)
     print(f"docs/insight.json written by {insight['model']} for {month_name(insight['month'])}:\n{insight['text']}")
 
 

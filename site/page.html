@@ -516,7 +516,7 @@ input[type="number"] { width: 9em; }
       "The 1% line is RBI's reported ask to NPCI, from press reports. It is not a published rule.",
       "NPCI published August 2022's debit reversal success rates without the decimal point (9123.00% for 91.23%). The pipeline corrects that month; the raw file is kept as published.",
       "The shop calculator adds your customers' banks' rate and your own bank's receiving rate. That is an approximation from monthly averages, not a model of single payments.",
-      "The monthly summary, when shown, is written by Claude from this page's figures. Code checks every number in it against the data and refuses to publish a summary that contains any other number.",
+      "The monthly summary, when shown, is written by an AI model from this page's figures. Code checks every number in it against the data and refuses to publish a summary that contains any other number.",
       `Built ${D.meta.built}. Data checks run before every build.`,
     ].forEach(t => ul.append(el("li", {}, t)));
     box.append(ul);
@@ -526,7 +526,7 @@ input[type="number"] { width: 9em; }
   function renderSummary(ins) {
     if (!ins || ins.month !== D.meta.months[lastM()]) return;
     document.getElementById("summary-text").textContent = ins.text;
-    document.getElementById("summary-note").textContent = `Written by Claude (${ins.model}) from the figures on this page, ${ins.generated}. Before it was published, an automatic check confirmed that every number in it appears in the data.`;
+    document.getElementById("summary-note").textContent = `Written by an AI model (${ins.model}) from the figures on this page, ${ins.generated}. Before it was published, an automatic check confirmed that every number in it appears in the data.`;
     document.getElementById("summary-section").hidden = false;
   }
 
