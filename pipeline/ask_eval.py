@@ -101,7 +101,8 @@ def summary(results: list) -> dict:
 
 
 def main() -> None:
-    questions_file, out, partial = (REDTEAM, REDTEAM_OUT, REDTEAM_PARTIAL) if "--redteam" in sys.argv else \
+    sys.stdout.reconfigure(errors="replace")  # a Windows console without UTF-8 cannot print "₹"; never lose a run to that
+    questions_file, out, partial =(REDTEAM, REDTEAM_OUT, REDTEAM_PARTIAL) if "--redteam" in sys.argv else \
         (QUESTIONS, OUT, PARTIAL)
     questions = json.loads(questions_file.read_text(encoding="utf-8"))
     asker = Asker(json.loads(DATA.read_text(encoding="utf-8")))
