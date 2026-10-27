@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.insights import facts, problems, ungrounded, write_insight
+from pipeline.insights import NUMBER, facts, figures, problems, ungrounded, write_insight
 
 DOCS = Path(__file__).resolve().parents[1] / "docs"
 
@@ -45,6 +45,17 @@ def test_grounded_text_passes(sheet):
 ])
 def test_invented_numbers_are_rejected(sheet, text, flagged):
     assert ungrounded(text, sheet) == flagged
+
+
+def test_rounded_or_worked_out_numbers_are_rejected(sheet):
+    # The model must copy figures exactly. Rounding one, or working out a difference itself, is an invented number.
+    p = sheet["paying_banks"]
+    now, before = (float(p[k].rstrip("%")) for k in ("technical_decline_rate", "previous_month_technical_decline_rate"))
+    allowed = {float(n.replace(",", "")) for n in NUMBER.findall(" ".join(figures(sheet)))}
+    made_up = [m for m in (f"{now:.1f}", f"{abs(now - before):.2f}", f"{now * 2:.2f}") if float(m) not in allowed]
+    assert made_up  # a coincidence with a real figure is rightly allowed, but not all three
+    for m in made_up:
+        assert ungrounded(f"Technical declines were {m}% this month.", sheet) == [m]
 
 
 def test_summary_written_only_when_it_passes(data, sheet, tmp_path):
