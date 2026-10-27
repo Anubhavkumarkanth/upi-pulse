@@ -2,8 +2,9 @@
 
 The model only writes the query. Every number and name in an answer comes from running that query on the bank_month
 rows the site shows (docs/data.json), in a locked DuckDB database: one table, no file or network access, a row limit
-and a time limit. A query is refused unless it is a single SELECT that reads only bank_month, and an answer is refused
-if it contains text that is not in the data.
+and a time limit. A query is refused unless it is a single SELECT that reads only bank_month and every result column
+reads the table (no typed-in values such as 99 AS td_pct), and an answer is refused if it contains text that is not in
+the data.
 Usage: python -m pipeline.ask "Which bank had the most technical declines in Oct 2025?" [--provider gemini|claude]
   gemini (default): Google Gemini free tier, key in GEMINI_API_KEY; claude: key in ANTHROPIC_API_KEY (paid)
 """
@@ -89,6 +90,26 @@ def table_refs(node, refs: list, ctes: set) -> tuple[list, set]:
     return refs, ctes
 
 
+def reads_data(node) -> bool:
+    """True if a parsed expression reads the table: a column, *, or COUNT(*)."""
+    if isinstance(node, list):
+        return any(reads_data(v) for v in node)
+    if not isinstance(node, dict):
+        return False
+    return node.get("class") in ("COLUMN_REF", "STAR") or node.get("function_name") == "count_star" or \
+        any(reads_data(v) for v in node.values())
+
+
+def typed_in_column(node) -> bool:
+    """True if any SELECT in a parsed query has a result column that reads nothing from the table, such as 99 AS td_pct:
+    a value the model typed in, which would show in the answer as if it were data."""
+    if isinstance(node, list):
+        return any(typed_in_column(v) for v in node)
+    if not isinstance(node, dict) or node.get("subquery_type") == "EXISTS":  # EXISTS (SELECT 1 ...) shows no value
+        return False
+    return not all(reads_data(e) for e in node.get("select_list", [])) or any(typed_in_column(v) for v in node.values())
+
+
 def plain(v):
     """A result value as JSON: numbers, text, dates as 'YYYY-MM-DD', or None. Lists, structs and the like are refused."""
     if v is None or isinstance(v, (bool, int, str)):
@@ -139,6 +160,8 @@ class Asker:
             if ref["type"] == "BASE_TABLE" and (ref["schema_name"] or ref["catalog_name"]
                                                or ref["table_name"].lower() not in ctes | {"bank_month"}):
                 raise Refused("The model's query was refused: it may read only the bank_month table.")
+        if typed_in_column(tree):
+            raise Refused("The model's query was refused: every column must come from the data.")
         return sql
 
     def run(self, sql: str) -> dict:
