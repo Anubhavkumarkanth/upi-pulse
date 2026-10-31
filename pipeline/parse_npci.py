@@ -22,6 +22,7 @@ NUMERIC = {
     "total_volume_in_mn": "volume_mn", "approved_percent": "approved_pct", "bd_percent": "bd_pct", "td_percent": "td_pct",
     "total_debit_reversal_count_in_mn": "debit_reversal_count_mn", "debit_reversal_success_percent": "debit_reversal_success_pct",
     "udir_auto_update_sr_percent": "udir_auto_update_sr_pct", "udir_refund_sr_percent": "udir_refund_sr_pct",
+    "deemed_approved_percent": "deemed_approved_pct",  # beneficiary side only
 }
 PUBLIC_SECTOR = {  # the 12 public sector banks, by bank_key
     "statebankofindia", "punjabnationalbank", "bankofbaroda", "canarabank", "unionbankofindia", "bankofindia",
@@ -52,6 +53,11 @@ ALIASES = {
 # Errors in NPCI's published data, fixed here so the raw files stay as downloaded: (side, month, column) -> divisor.
 # Aug 2022: every bank's debit reversal success % lost its decimal point ('9123.00%' for 91.23%).
 SOURCE_FIXES = {("remitter", "2022-08-01", "debit_reversal_success_pct"): 100}
+# NPCI files too damaged to use; Time Series of India fills these months instead: (side, month).
+# Jan 2025 beneficiary: every percentage published as a two-decimal fraction ('0.01%' for about 1%), so the detail is lost.
+SOURCE_SKIPS = {("beneficiary", "2025-01-01")}
+# Single impossible cells, blanked rather than guessed: (side, month, bank_key, column).
+SOURCE_BLANKS = {("beneficiary", "2024-09-01", "tamilnadmercantilebank", "approved_pct")}  # published as 124.22%
 
 
 def bank_key(name: str) -> str:
@@ -121,10 +127,17 @@ def tsoi_rows() -> pd.DataFrame:
 def build() -> pd.DataFrame:
     records = {}
     for side, year, month, rows in raw_responses():
+        if (side, f"{year}-{MONTHS[month]:02d}-01") in SOURCE_SKIPS:
+            continue
+        seen = set()
         for r in rows:
             name = r.get("upi_remitter_banks") or r.get("upi_beneficiary_banks")
-            rec = {"side": side, "month": f"{year}-{MONTHS[month]:02d}-01", "npci_rank": int(r["sr_no"]), "bank_raw": name.strip(),
-                   "bank_key": bank_key(name), "npci_row_id": r["id"], "npci_updated_at": r["updated_at"], "source": "npci"}
+            key = bank_key(name)
+            if key in seen:  # NPCI lists one name twice in a month (Slice Small Finance Bank, Mar and Jun 2026): keep both rows
+                key, name = key + "2", name.strip() + " (second NPCI entry)"
+            seen.add(key)
+            rec = {"side": side, "month": f"{year}-{MONTHS[month]:02d}-01", "npci_rank": int(r.get("sr_no") or r["srno"]), "bank_raw": name.strip(),
+                   "bank_key": key, "npci_row_id": r["id"], "npci_updated_at": r["updated_at"], "source": "npci"}
             rec.update({new: number(r.get(old)) for old, new in NUMERIC.items()})
             records[(side, rec["month"], rec["bank_key"])] = rec  # a later file for the same month replaces an earlier one
     npci = pd.DataFrame(records.values())
@@ -139,6 +152,13 @@ def build() -> pd.DataFrame:
         rows = (df.side == side) & (df.month == month)
         if df.loc[rows, col].max() > 100:  # skip if NPCI has since corrected the file
             df.loc[rows, col] = (df.loc[rows, col] / divisor).round(2)
+    for side, month, key, col in SOURCE_BLANKS:
+        df.loc[(df.side == side) & (df.month == month) & (df.bank_key == key), col] = None
+    # Before Jul 2023 NPCI mostly reported beneficiary deemed approvals outside approved %; later months include them.
+    # Add them in wherever approved + BD + TD falls short of 100 by exactly the deemed share, so approved % means one thing.
+    short = (df.approved_pct + df.bd_pct + df.td_pct - 100).abs() > 0.05
+    fits = (df.approved_pct + df.bd_pct + df.td_pct + df.deemed_approved_pct - 100).abs() <= 0.05
+    df.loc[short & fits, "approved_pct"] = (df.approved_pct + df.deemed_approved_pct).round(2)
     # NPCI's Sr. No. is its listing order and sometimes lags the month's volumes, so rank by volume separately.
     df["volume_rank"] = df.groupby(["side", "month"]).volume_mn.rank(ascending=False, method="min").astype(int)
     # Display name: the most used spelling that is not all capitals, cleaned of 'The' and 'Ltd' (the most recent wins a tie).
@@ -147,6 +167,7 @@ def build() -> pd.DataFrame:
     names = (names.groupby(["bank_key", "caps", "name"]).month.agg(["count", "max"]).reset_index()
                   .sort_values(["caps", "count", "max"], ascending=[True, False, False])
                   .drop_duplicates("bank_key").set_index("bank_key").name)
+    names["punjabandsindbank"] = "Punjab & Sind Bank"  # the bank's own spelling, which NPCI's files mostly write as 'and'
     df.insert(df.columns.get_loc("bank_key") + 1, "bank", df.bank_key.map(names))
     df.insert(df.columns.get_loc("bank") + 1, "bank_type", df.bank_key.map(bank_type))
     return df

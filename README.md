@@ -148,8 +148,8 @@ What these checks cannot catch:
 All figures come from the National Payments Corporation of India (NPCI): UPI Ecosystem Statistics, Top 50 Member
 Performance ([npci.org.in](https://www.npci.org.in/product/ecosystem-statistics/upi)). The data belongs to NPCI.
 
-- Paying banks, Jan 2022 to Oct 2024 and Sep 2026: NPCI's own API responses, saved unchanged in `data/raw/npci/`.
-- Paying banks, Nov 2024 to Aug 2026, and all receiving-bank months: [Time Series of India](https://timeseriesofindia.com)'s copy of the same NPCI data, used while NPCI's site was down in October 2026. Wherever both copies exist, every bank's technical and business decline rates match exactly. The copy has volumes and decline rates only, and it is not stored in this repository.
+- Every month on both sides except one: NPCI's own API responses, saved unchanged in `data/raw/npci/`.
+- Receiving banks, Jan 2025: [Time Series of India](https://timeseriesofindia.com)'s copy of the same NPCI data, because NPCI's own file for that month lost its decimal detail. Wherever both copies exist, every bank's technical and business decline rates match exactly. The copy has volumes and decline rates only, and it is not stored in this repository.
 
 The `source` column of each row says which copy it came from. See [data/SOURCES.md](data/SOURCES.md) for details.
 
