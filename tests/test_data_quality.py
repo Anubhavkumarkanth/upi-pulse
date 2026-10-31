@@ -7,7 +7,7 @@ from pipeline.parse_npci import ALIASES, PUBLIC_SECTOR, TSOI, bank_key, bank_typ
 # The Time Series of India copy stays on the author's machine (data/raw/tsoi is not in git), so checks of it skip elsewhere.
 needs_tsoi = pytest.mark.skipif(not any(TSOI.glob("bank-performance_*.json")),
                                 reason="Time Series of India copy not present (kept local, not in git)")
-PCT =["approved_pct", "bd_pct", "td_pct", "debit_reversal_success_pct", "udir_auto_update_sr_pct", "udir_refund_sr_pct"]
+PCT =["approved_pct", "bd_pct", "td_pct", "debit_reversal_success_pct", "udir_auto_update_sr_pct", "udir_refund_sr_pct", "deemed_approved_pct"]
 
 
 @pytest.fixture(scope="module")
@@ -23,8 +23,13 @@ def test_percentages_between_0_and_100(df):
 
 def test_approved_bd_td_add_up_to_100(df):
     npci = df[df.source == "npci"]  # the Time Series of India copy has no approved %
+    # Known exceptions: beneficiary rows NPCI publishes as not adding up to 100 with or without deemed approvals (97.56 to 100.48).
+    odd = {("2022-12-01", "citibank"), ("2022-12-01", "karnatakavikasgrameenabank"), ("2023-03-01", "yesbank"),
+           ("2023-04-01", "yesbank"), ("2023-04-01", "rblbank"), ("2024-11-01", "canarabank")}
+    npci = npci[~((npci.side == "beneficiary") & pd.Series(list(zip(npci.month, npci.bank_key)), index=npci.index).isin(odd))]
     total = npci.approved_pct + npci.bd_pct + npci.td_pct
-    assert ((total - 100).abs() <= 0.05).all(), npci.loc[(total - 100).abs() > 0.05, ["month", "bank", "approved_pct", "bd_pct", "td_pct"]]
+    off = total.notna() & ((total - 100).abs() > 0.05)
+    assert not off.any(), npci.loc[off, ["month", "bank", "approved_pct", "bd_pct", "td_pct"]]
 
 
 def test_one_row_per_bank_per_month(df):
@@ -38,6 +43,9 @@ def test_one_source_per_month(df):
 def test_fifty_banks_ranked_1_to_50_each_npci_month(df):
     # Also catches two spellings merged by ALIASES in the same month, since one would overwrite the other.
     for (side, month), g in df[df.source == "npci"].groupby(["side", "month"]):
+        if (side, month) == ("remitter", "2025-09-01"):  # NPCI's own file lists Sr. No. 30 twice and no 39
+            assert len(g) == 50 and sorted(g.npci_rank) == sorted([*range(1, 39), 30, *range(40, 51)])
+            continue
         assert sorted(g.npci_rank) == list(range(1, 51)), f"{side} {month}: {len(g)} rows"
 
 
@@ -92,8 +100,10 @@ def test_tsoi_copy_matches_npci():
     assert len(both) >= 0.99 * len(npci)
     off = both[(both.bd_pct.round(2) != both.bd_pct_tsoi) | (both.td_pct.round(2) != both.td_pct_tsoi)
                | ((both.volume_mn - both.volume_mn_tsoi).abs() > 0.1)]
-    # Only known difference: Time Series of India merges AU Small Finance Bank's two handles in Jul 2024.
-    assert set(zip(off.side, off.month, off.bank_key)) == {("remitter", "2024-07-01", "ausmallfinancebank")}, off
+    # Known differences: Time Series of India merges AU Small Finance Bank's two handles in Jul 2024, and has
+    # Yes Bank's Oct 2022 beneficiary volume as 1227.7 million where NPCI's file says 1219.77.
+    assert set(zip(off.side, off.month, off.bank_key)) == {("remitter", "2024-07-01", "ausmallfinancebank"),
+                                                           ("beneficiary", "2022-10-01", "yesbank")}, off
 
 
 @needs_tsoi
