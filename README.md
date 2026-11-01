@@ -178,3 +178,9 @@ skip. On GitHub Actions, the tests run on every push.
 - For the months filled from the copy, approval rates, debit reversals and UDIR figures are not available yet. They will come from NPCI's own files.
 - The AI summary restates the month's figures and does not explain causes. On Gemini's free tier, what is sent may be used to improve Google's products. Only NPCI's public figures are sent.
 - The question box's model can misread a question, and the score above shows how often. The query is always shown, so an answer can be checked. Only the table's layout, the bank names and the question are sent to the model, and on Gemini's free tier they may be used to improve Google's products.
+
+## Used by
+
+The UPI payment failure lab in my [Orderdesk QA project](https://github.com/Anubhavkumarkanth/orderdesk-qa-suite) fails
+pretend payments at the decline rates measured here: 9.62% business and 0.29% technical declines at paying banks over the
+last 12 months.
