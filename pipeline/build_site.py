@@ -41,14 +41,13 @@ def site_data(df) -> dict:
     return {
         "meta": {"built": date.today().isoformat(), "months": months, "td_target": A.TD_TARGET,
                  "last12": [last12[0], last12[-1]], "drivers_before": "2024",
-                 "alert_rule": {"z": A.ALERT_Z, "min_rise": A.ALERT_MIN_RISE, "min_history": A.ALERT_MIN_HISTORY},
-                 "sources": {side: {s: sorted(g[g.source == s].month.unique().tolist()) for s in ("npci", "tsoi")}
-                             for side, g in df.groupby("side")}},
+                 "alert_rule": {"z": A.ALERT_Z, "min_rise": A.ALERT_MIN_RISE, "min_history": A.ALERT_MIN_HISTORY}},
         "banks": [{"k": r.bank_key, "n": r.bank, "t": r.bank_type} for r in banks.itertuples()],
         # rows[side] = [month index, bank index, volume (million), TD %, BD %]
         "rows": {side: [[month_idx[r.month], bank_idx[r.bank_key], r2(r.volume_mn), r2(r.td_pct), r2(r.bd_pct)]
                         for r in g.itertuples()] for side, g in df.groupby("side")},
-        "summary": {side: [{"m": month_idx[r.month], "src": r.source, "banks": r.banks, "under": r.under_target,
+        # "under" is None for a month with no technical decline rate, so the page never shows "0 of 50 under 1%" for it
+        "summary": {side: [{"m": month_idx[r.month], "banks": r.banks, "under": None if r.td_pct != r.td_pct else r.under_target,
                             "td": r2(r.td_pct), "bd": r2(r.bd_pct), "vol": r2(r.volume_mn), "top5": r2(r.top5_share)}
                            for r in g.itertuples()] for side, g in summary.groupby("side")},
         "drivers": {"change": r2(bd_change), "rows": [

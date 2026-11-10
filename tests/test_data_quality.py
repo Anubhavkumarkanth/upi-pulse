@@ -2,11 +2,8 @@
 import pandas as pd
 import pytest
 
-from pipeline.parse_npci import ALIASES, PUBLIC_SECTOR, TSOI, bank_key, bank_type, build, display_name, number, tsoi_rows
+from pipeline.parse_npci import ALIASES, PUBLIC_SECTOR, bank_key, bank_type, build, display_name, number
 
-# The Time Series of India copy stays on the author's machine (data/raw/tsoi is not in git), so checks of it skip elsewhere.
-needs_tsoi = pytest.mark.skipif(not any(TSOI.glob("bank-performance_*.json")),
-                                reason="Time Series of India copy not present (kept local, not in git)")
 PCT =["approved_pct", "bd_pct", "td_pct", "debit_reversal_success_pct", "udir_auto_update_sr_pct", "udir_refund_sr_pct", "deemed_approved_pct"]
 
 
@@ -22,7 +19,7 @@ def test_percentages_between_0_and_100(df):
 
 
 def test_approved_bd_td_add_up_to_100(df):
-    npci = df[df.source == "npci"]  # the Time Series of India copy has no approved %
+    npci = df
     # Known exceptions: beneficiary rows NPCI publishes as not adding up to 100 with or without deemed approvals (97.56 to 100.48).
     odd = {("2022-12-01", "citibank"), ("2022-12-01", "karnatakavikasgrameenabank"), ("2023-03-01", "yesbank"),
            ("2023-04-01", "yesbank"), ("2023-04-01", "rblbank"), ("2024-11-01", "canarabank")}
@@ -36,23 +33,13 @@ def test_one_row_per_bank_per_month(df):
     assert not df.duplicated(["side", "month", "bank_key"]).any()
 
 
-def test_one_source_per_month(df):
-    assert (df.groupby(["side", "month"]).source.nunique() == 1).all()
-
-
 def test_fifty_banks_ranked_1_to_50_each_npci_month(df):
     # Also catches two spellings merged by ALIASES in the same month, since one would overwrite the other.
-    for (side, month), g in df[df.source == "npci"].groupby(["side", "month"]):
+    for (side, month), g in df.groupby(["side", "month"]):
         if (side, month) == ("remitter", "2025-09-01"):  # NPCI's own file lists Sr. No. 30 twice and no 39
             assert len(g) == 50 and sorted(g.npci_rank) == sorted([*range(1, 39), 30, *range(40, 51)])
             continue
         assert sorted(g.npci_rank) == list(range(1, 51)), f"{side} {month}: {len(g)} rows"
-
-
-def test_49_or_50_banks_each_filled_month(df):
-    # Time Series of India sometimes merges two handles of one bank into a single row.
-    for (side, month), g in df[df.source == "tsoi"].groupby(["side", "month"]):
-        assert 49 <= len(g) <= 50, f"{side} {month}: {len(g)} rows"
 
 
 def test_volumes_positive(df):
@@ -92,21 +79,6 @@ def test_aug_2022_debit_reversal_fix(df):
     assert sbi.debit_reversal_success_pct == pytest.approx(91.23)
 
 
-@needs_tsoi
-def test_tsoi_copy_matches_npci():
-    # Two copies of the same NPCI data must agree wherever both have a bank-month.
-    npci = build().query("source == 'npci'")
-    both = npci.merge(tsoi_rows(), on=["side", "month", "bank_key"], suffixes=("", "_tsoi"))
-    assert len(both) >= 0.99 * len(npci)
-    off = both[(both.bd_pct.round(2) != both.bd_pct_tsoi) | (both.td_pct.round(2) != both.td_pct_tsoi)
-               | ((both.volume_mn - both.volume_mn_tsoi).abs() > 0.1)]
-    # Known differences: Time Series of India merges AU Small Finance Bank's two handles in Jul 2024, and has
-    # Yes Bank's Oct 2022 beneficiary volume as 1227.7 million where NPCI's file says 1219.77.
-    assert set(zip(off.side, off.month, off.bank_key)) == {("remitter", "2024-07-01", "ausmallfinancebank"),
-                                                           ("beneficiary", "2022-10-01", "yesbank")}, off
-
-
-@needs_tsoi
 @pytest.mark.parametrize("bank, volume, bd, td", [
     ("ausmallfinancebank", 44.585, 0.62, 0.11),
     ("airtelpaymentsbank", 590.913, 3.9, 0.04),
@@ -117,7 +89,13 @@ def test_beneficiary_spot_check_against_dataful_preview(df, bank, volume, bd, td
     assert row.volume_mn == pytest.approx(volume, abs=0.06) and row.bd_pct == pytest.approx(bd) and row.td_pct == pytest.approx(td)
 
 
-@needs_tsoi
+def test_jan_2025_receiving_bank_percentages_are_blank(df):
+    # NPCI published that month's percentages as rounded fractions (0.00% for 0.38%), so they are never shown as data.
+    month = df[(df.side == "beneficiary") & (df.month == "2025-01-01")]
+    assert len(month) == 50 and (month.volume_mn > 0).all()
+    assert month[["approved_pct", "bd_pct", "td_pct"]].isna().all().all()
+
+
 def test_no_missing_months(df):
     for side in ("remitter", "beneficiary"):
         months = pd.to_datetime(df[df.side == side].month)

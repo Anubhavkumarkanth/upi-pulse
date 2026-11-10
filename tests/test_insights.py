@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from pipeline import insights
 from pipeline.insights import NUMBER, facts, figures, problems, ungrounded, write_insight
 
 DOCS = Path(__file__).resolve().parents[1] / "docs"
@@ -99,3 +100,24 @@ def test_published_summary_is_current_and_passes_every_check(data):
     insight = json.loads((DOCS / "insight.json").read_text(encoding="utf-8"))
     assert insight["month"] == data["meta"]["months"][-1]
     assert problems(insight["text"], facts(data)) == []
+
+
+def test_gemini_moves_to_the_next_model_when_one_times_out(monkeypatch):
+    # A timeout is raised by the HTTP library, not as a Gemini error, and must not stop the other models being tried.
+    from google import genai
+
+    class Reply:
+        text, model_version = "a summary", None
+
+    class Models:
+        def generate_content(self, model, **_):
+            if model == insights.GEMINI_MODELS[0]:
+                raise TimeoutError("the read timed out")
+            return Reply()
+
+    class Client:
+        def __init__(self, **_):
+            self.models = Models()
+
+    monkeypatch.setattr(genai, "Client", Client)
+    assert insights.gemini_text("system", "user") == ("a summary", insights.GEMINI_MODELS[1])

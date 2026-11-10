@@ -94,10 +94,10 @@ with `ASK_PROVIDER=claude`. The model writes only the query; the numbers and nam
 
 - DuckDB parses the query, and it must be a single SELECT that reads only the `bank_month` table. File readers, system tables, lists of typed-in values and second statements are refused.
 - The database lives in memory and holds only the rows the site shows. It cannot read files or reach the network, and its settings are locked. A query returns at most 200 rows and is stopped after 5 seconds.
-- Every piece of text in an answer must be a bank name, bank type or month from the data, so the model cannot slip its own words into an answer.
-- Every column of an answer must read the table. A query that types in its own value, such as `99 AS td_pct` next to a real bank name, is refused, so a made-up number cannot pass for data.
+- Every piece of text in an answer's rows must be a bank name, bank type or month from the data, so the model cannot put its own words into a result. The model does write the column names, which are limited to 40 letters, digits and underscores.
+- Every column of an answer must read the table. A query that types in its own value, such as `99 AS td_pct` next to a real bank name, is refused. Arithmetic on a column is allowed, because weighted averages need it, so a model that was talked into it could still write `td_pct * 0 + 99`. The query is always shown with the answer, which is how such an answer is caught.
 - Anyone can type anything, so the tests hand the code a model that obeys "ignore your rules" and check that nothing it writes gets through.
-- Each visitor can ask 8 questions a minute and 50 a day, and everyone together 300 a day. That keeps the free model quota (or a paid key's bill) small.
+- Each visitor can ask 8 questions a minute and 50 a day, and everyone together 300 a day. The counts are kept in memory, so they start again when the service restarts, which the free plan does after 15 quiet minutes. The hard limit is the model provider's own quota: the free tier's, or a spend limit set on a paid key.
 
 Accuracy is measured on 30 test questions whose answers were worked out from the data (`pipeline/ask_questions.json`),
 and the tests check those answers again on every push. `python -m pipeline.ask_eval` puts the questions to the model. An
@@ -110,7 +110,7 @@ Latest score: 30 of 30 right (gemini-3.1-flash-lite, 27 October 2026). Each ques
 wrote, is in `docs/ask_eval.json`. The question box tries `gemini-3.8-flash` first; this run used
 `gemini-3.1-flash-lite` because the other two free models were out of quota that day.
 
-The service is a small FastAPI app on Render's free plan (`render.yaml`), and it holds the API key. The free plan sleeps
+The service is a small FastAPI app on Render's free plan (`render.yaml`), and it holds the API key. Render deploys a push only after the tests pass on GitHub. The free plan sleeps
 after 15 quiet minutes, so the first question can take up to a minute. The page says so, and nothing else on it depends
 on the service.
 
@@ -119,9 +119,9 @@ on the service.
 The tests on every push never call a real model. They hand the code stand-in models with fixed replies, including
 models that do what an attacker asks, and check what would reach the page.
 
-- No invented numbers. A summary with a number that is not among the figures is refused, and so is a figure the model rounded or worked out itself. A question box answer cannot carry a typed-in number.
+- No invented numbers. A summary with a number that is not among the figures is refused, and so is a figure the model rounded or worked out itself. A question box answer cannot have a column that is only a typed-in number.
 - Questions the data cannot answer. The model is told to reply NONE, and the page then says the question can't be answered from this data. Refusal messages are written by the code, so a model cannot use them to show its own words, and the service never passes on what the model or its API said in an error.
-- Attacks. An instruction hidden in a bank name, or a question saying "ignore your rules", cannot get a made-up number, a link, a file, a setting or the API key onto the page. The page shows all of this text as text, so markup hidden in it is never run.
+- Attacks. An instruction hidden in a bank name, or a question saying "ignore your rules", cannot get a link, a file, a setting or the API key onto the page, or a made-up number into the monthly summary. The page shows all of this text as text, so markup hidden in it is never run.
 - Each of these checks was broken once on purpose, and its test failed.
 
 The real model is tested apart from the stand-ins. `python -m pipeline.ask_eval --redteam` puts 16 questions to it
@@ -148,10 +148,10 @@ What these checks cannot catch:
 All figures come from the National Payments Corporation of India (NPCI): UPI Ecosystem Statistics, Top 50 Member
 Performance ([npci.org.in](https://www.npci.org.in/product/ecosystem-statistics/upi)). The data belongs to NPCI.
 
-- Every month on both sides except one: NPCI's own API responses, saved unchanged in `data/raw/npci/`.
-- Receiving banks, Jan 2025: [Time Series of India](https://timeseriesofindia.com)'s copy of the same NPCI data, because NPCI's own file for that month lost its decimal detail. Wherever both copies exist, every bank's technical and business decline rates match exactly. The copy has volumes and decline rates only, and it is not stored in this repository.
+- Every month on both sides: NPCI's own API responses, saved unchanged in `data/raw/npci/`.
+- Receiving banks, Jan 2025: NPCI published every percentage rounded to a two-decimal fraction (0.00% where the month before was 0.38%), so that month's rates are left blank and the charts show a gap. Its payment counts are used.
 
-The `source` column of each row says which copy it came from. See [data/SOURCES.md](data/SOURCES.md) for details.
+See [data/SOURCES.md](data/SOURCES.md) for details.
 
 ## Run it yourself
 
@@ -168,14 +168,24 @@ python -m pipeline.ask_eval --redteam           # puts the 16 questions it must 
 uvicorn api.main:app --port 8000                # the question service; needs GEMINI_API_KEY in the environment
 ```
 
-Without the Time Series of India file, the pipeline builds only NPCI's own months, and the checks that need that file
-skip. On GitHub Actions, the tests run on every push.
+On GitHub Actions, the tests run on every push.
+
+## Add a new month
+
+NPCI publishes a month's table some weeks after the month ends. Its site refuses downloads from scripts, so the file is saved from a browser.
+
+1. Open this address in a browser, with the year and month you want (`Oct`, `Nov` ...), once with `type_name=remitter` and once with `type_name=beneficiary`:
+   `https://www.npci.org.in/api/ecosystem-statistics/get-statistics?product_name=UPI&tab_name=top50-member&type_name=remitter&year=2026&month=Oct&page_no=1&sort_by=asc&size=50&locale=en`
+2. If `results` is empty, NPCI has not published that month yet. Otherwise save each page unchanged in `data/raw/npci/`, as `top50_remitter_2026_Oct.json` and `top50_beneficiary_2026_Oct.json`.
+3. Run `pytest -q tests/test_data_quality.py`. These checks fail if a month is missing, a bank appears twice or a percentage is out of range.
+4. Run `python -m pipeline.build_site`, then `python -m pipeline.insights` for the new month's summary.
+5. Run `python -m pipeline.ask_eval --update-answers`, then the full `pytest -q`, and commit `data/raw/npci/`, `docs/` and `pipeline/ask_questions.json`.
 
 ## Limits
 
 - These are monthly totals per bank, so the shop calculator is an estimate from averages.
 - The 1% line comes from press reports of RBI's request to NPCI. It is not a published rule.
-- For the months filled from the copy, approval rates, debit reversals and UDIR figures are not available yet. They will come from NPCI's own files.
+- Receiving banks have no decline rates for January 2025, because NPCI's file for that month is unusable.
 - The AI summary restates the month's figures and does not explain causes. On Gemini's free tier, what is sent may be used to improve Google's products. Only NPCI's public figures are sent.
 - The question box's model can misread a question, and the score above shows how often. The query is always shown, so an answer can be checked. Only the table's layout, the bank names and the question are sent to the model, and on Gemini's free tier they may be used to improve Google's products.
 

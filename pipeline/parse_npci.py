@@ -1,7 +1,5 @@
 """Parse NPCI "Top 50 Member Performance" responses (saved unchanged in data/raw/npci) into one tidy table.
 
-Months not yet downloaded from NPCI are filled from Time Series of India's copy of the same NPCI data
-(data/raw/tsoi, kept out of git), which has volume, BD % and TD % only. The `source` column marks each row.
 Output: data/processed/bank_month.csv and data/processed/upi_pulse.duckdb, one row per (side, month, bank).
 Usage: python pipeline/parse_npci.py
 """
@@ -14,9 +12,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw" / "npci"
-TSOI = ROOT / "data" / "raw" / "tsoi"
 OUT = ROOT / "data" / "processed"
-TSOI_SIDES = {"UPI Remitter": "remitter", "UPI Beneficiary": "beneficiary"}
 MONTHS = {m: i for i, m in enumerate(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], 1)}
 NUMERIC = {
     "total_volume_in_mn": "volume_mn", "approved_percent": "approved_pct", "bd_percent": "bd_pct", "td_percent": "td_pct",
@@ -48,14 +44,13 @@ ALIASES = {
     "saraswatbank": "saraswatcooperativebank",
     "standardchartered": "standardcharteredbank",
     "triotechsolutionsprivateppi": "triotechsolutionsprivate",
-    "triotechsolutions": "triotechsolutionsprivate",  # Time Series of India's spelling
 }
 # Errors in NPCI's published data, fixed here so the raw files stay as downloaded: (side, month, column) -> divisor.
 # Aug 2022: every bank's debit reversal success % lost its decimal point ('9123.00%' for 91.23%).
 SOURCE_FIXES = {("remitter", "2022-08-01", "debit_reversal_success_pct"): 100}
-# NPCI files too damaged to use; Time Series of India fills these months instead: (side, month).
-# Jan 2025 beneficiary: every percentage published as a two-decimal fraction ('0.01%' for about 1%), so the detail is lost.
-SOURCE_SKIPS = {("beneficiary", "2025-01-01")}
+# Months whose percentages NPCI published too damaged to use. They are blanked, not guessed; volumes are kept: (side, month).
+# Jan 2025 beneficiary: every percentage was rounded to a two-decimal fraction ('0.00%' for 0.38%), so the detail is lost.
+SOURCE_BLANK_MONTHS = {("beneficiary", "2025-01-01")}
 # Single impossible cells, blanked rather than guessed: (side, month, bank_key, column).
 SOURCE_BLANKS = {("beneficiary", "2024-09-01", "tamilnadmercantilebank", "approved_pct")}  # published as 124.22%
 
@@ -108,27 +103,9 @@ def raw_responses():
                 yield rows[0]["type_name"], int(rows[0]["year"]), rows[0]["month"], rows
 
 
-def tsoi_rows() -> pd.DataFrame:
-    """All UPI rows from the newest Time Series of India file, in this table's columns (other measures left empty)."""
-    files = sorted(TSOI.glob("bank-performance_*.json"))
-    if not files:
-        return pd.DataFrame(columns=["side", "month", "bank_raw", "bank_key", "volume_mn", "bd_pct", "td_pct", "source"])
-    t = pd.DataFrame(json.loads(files[-1].read_text(encoding="utf-8"))["rows"])
-    t = t[t.system.isin(TSOI_SIDES)]
-    df = pd.DataFrame({"side": t.system.map(TSOI_SIDES), "month": t.date, "bank_raw": t.bank.str.strip(),
-                       "bank_key": t.bank.map(bank_key), "volume_mn": (t.volume_cr * 10).round(1),
-                       "bd_pct": t.bd_pct, "td_pct": t.td_pct, "source": "tsoi"})
-    dupes = df[df.duplicated(["side", "month", "bank_key"], keep=False)]
-    if len(dupes):
-        raise ValueError(f"two tsoi names share a bank key in one month:\n{dupes}")
-    return df
-
-
 def build() -> pd.DataFrame:
     records = {}
     for side, year, month, rows in raw_responses():
-        if (side, f"{year}-{MONTHS[month]:02d}-01") in SOURCE_SKIPS:
-            continue
         seen = set()
         for r in rows:
             name = r.get("upi_remitter_banks") or r.get("upi_beneficiary_banks")
@@ -137,23 +114,19 @@ def build() -> pd.DataFrame:
                 key, name = key + "2", name.strip() + " (second NPCI entry)"
             seen.add(key)
             rec = {"side": side, "month": f"{year}-{MONTHS[month]:02d}-01", "npci_rank": int(r.get("sr_no") or r["srno"]), "bank_raw": name.strip(),
-                   "bank_key": key, "npci_row_id": r["id"], "npci_updated_at": r["updated_at"], "source": "npci"}
+                   "bank_key": key, "npci_row_id": r["id"], "npci_updated_at": r["updated_at"]}
             rec.update({new: number(r.get(old)) for old, new in NUMERIC.items()})
             records[(side, rec["month"], rec["bank_key"])] = rec  # a later file for the same month replaces an earlier one
-    npci = pd.DataFrame(records.values())
-    # NPCI's own file wins: Time Series of India fills only the (side, month) pairs NPCI has not given us.
-    tsoi = tsoi_rows()
-    have = set(zip(npci.side, npci.month))
-    tsoi = tsoi[[pair not in have for pair in zip(tsoi.side, tsoi.month)]]
-    df = pd.concat([npci, tsoi], ignore_index=True).sort_values(["side", "month", "npci_rank", "volume_mn"],
-                                                                ascending=[True, True, True, False], ignore_index=True)
-    df["npci_rank"] = df.npci_rank.astype("Int64")
+    df = pd.DataFrame(records.values()).sort_values(["side", "month", "npci_rank", "volume_mn"],
+                                                    ascending=[True, True, True, False], ignore_index=True)
     for (side, month, col), divisor in SOURCE_FIXES.items():
         rows = (df.side == side) & (df.month == month)
         if df.loc[rows, col].max() > 100:  # skip if NPCI has since corrected the file
             df.loc[rows, col] = (df.loc[rows, col] / divisor).round(2)
     for side, month, key, col in SOURCE_BLANKS:
         df.loc[(df.side == side) & (df.month == month) & (df.bank_key == key), col] = None
+    for side, month in SOURCE_BLANK_MONTHS:
+        df.loc[(df.side == side) & (df.month == month), [c for c in NUMERIC.values() if c.endswith("_pct")]] = None
     # Before Jul 2023 NPCI mostly reported beneficiary deemed approvals outside approved %; later months include them.
     # Add them in wherever approved + BD + TD falls short of 100 by exactly the deemed share, so approved % means one thing.
     short = (df.approved_pct + df.bd_pct + df.td_pct - 100).abs() > 0.05

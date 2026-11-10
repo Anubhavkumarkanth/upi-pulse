@@ -5,5 +5,5 @@ __pycache__/
 data/processed/
 # Dataful copies: their terms bar redistribution, so they stay local
 data/raw/dataful/
-# Time Series of India copy of NPCI data: used to fill months, kept local
+# Time Series of India copy of NPCI data: no longer used, and still kept out of git
 data/raw/tsoi/

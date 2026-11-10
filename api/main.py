@@ -2,7 +2,8 @@
 
 It holds the model's API key, which is set in Render's dashboard (or the local environment), never in the repository:
 GEMINI_API_KEY by default, or ANTHROPIC_API_KEY with ASK_PROVIDER=claude. Each visitor may ask a few questions a minute
-and a day, and all visitors together have a daily cap, so the free model quota (or a paid key's bill) stays small.
+and a day, and all visitors together have a daily cap, so the free model quota (or a paid key's bill) stays small. The
+counts live in memory and start again when the service restarts, so the provider's own quota is the hard limit.
 Run locally: uvicorn api.main:app --port 8000   (a copy of the site on localhost calls http://localhost:8000)
 """
 import json

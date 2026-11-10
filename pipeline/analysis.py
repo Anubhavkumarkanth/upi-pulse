@@ -14,14 +14,15 @@ ALERT_MIN_HISTORY = 6  # months of the bank's own history needed in the past 12 
 
 
 def weighted(df: pd.DataFrame, col: str) -> float:
-    return (df[col] * df.volume_mn).sum() / df.volume_mn.sum()
+    d = df.dropna(subset=[col])  # a month whose percentages are blank has no rate, rather than a rate of 0
+    return (d[col] * d.volume_mn).sum() / d.volume_mn.sum() if len(d) else float("nan")
 
 
 def monthly_summary(df: pd.DataFrame) -> pd.DataFrame:
     """One row per side and month: weighted TD and BD, banks under the 1% TD target, volume and the top 5 banks' share."""
     rows = []
     for (side, month), g in df.groupby(["side", "month"]):
-        rows.append({"side": side, "month": month, "source": g.source.iloc[0], "banks": len(g),
+        rows.append({"side": side, "month": month, "banks": len(g),
                      "under_target": int((g.td_pct < TD_TARGET).sum()), "td_pct": weighted(g, "td_pct"),
                      "bd_pct": weighted(g, "bd_pct"), "volume_mn": g.volume_mn.sum(),
                      "top5_share": g.nlargest(5, "volume_mn").volume_mn.sum() / g.volume_mn.sum() * 100})
@@ -77,7 +78,7 @@ def alerts(df: pd.DataFrame) -> pd.DataFrame:
     for (side, key), g in df.groupby(["side", "bank_key"]):
         g = g.assign(when=pd.to_datetime(g.month)).sort_values("when")
         for _, row in g.iterrows():
-            past = g[(g.when < row.when) & (g.when >= row.when - pd.DateOffset(months=12))].td_pct
+            past = g[(g.when < row.when) & (g.when >= row.when - pd.DateOffset(months=12))].td_pct.dropna()
             if len(past) < ALERT_MIN_HISTORY:
                 continue
             z = robust_z(past, row.td_pct)
