@@ -69,8 +69,10 @@ def facts(data: dict) -> dict:
             "year_ago_technical_decline_rate": pct(year_ago["td"]), "business_decline_rate": pct(now["bd"]),
             "year_ago_business_decline_rate": pct(year_ago["bd"]),
             "banks_under_target": f"{now['under']} of {now['banks']}", "year_ago_banks_under_target": str(year_ago["under"]),
-            "payments": f"{now['vol'] / 1000:.1f} billion", "one_in_payments_fails_technically": f"1 in {round(100 / now['td'])}",
+            "payments": f"{now['vol'] / 1000:.1f} billion",
         }
+        if now["td"] > 0:  # a rate that rounds to 0.00% has no "1 in N"
+            out[label]["one_in_payments_fails_technically"] = f"1 in {round(100 / now['td'])}"
     rows = {(r[0], r[1]): r for r in data["rows"]["remitter"]}
     current = sorted((r for (m, _), r in rows.items() if m == last), key=lambda r: -r[3])
     out["paying_banks"]["highest_technical_decline_banks"] = [

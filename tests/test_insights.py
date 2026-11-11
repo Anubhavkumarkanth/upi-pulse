@@ -28,6 +28,14 @@ def test_facts_match_the_site_figures(data, sheet):
     assert sheet["paying_banks"]["banks_under_target"] == f"{now['under']} of {now['banks']}"
 
 
+def test_a_rate_of_zero_has_no_one_in_n_figure(data):
+    zero = copy.deepcopy(data)
+    zero["summary"]["beneficiary"][-1]["td"] = 0.0
+    sheet = facts(zero)
+    assert "one_in_payments_fails_technically" not in sheet["receiving_banks"]
+    assert "one_in_payments_fails_technically" in sheet["paying_banks"]
+
+
 def test_grounded_text_passes(sheet):
     p = sheet["paying_banks"]
     text = (f"In {sheet['month']}, {p['technical_decline_rate']} of payments at paying banks failed for a technical "

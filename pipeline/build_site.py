@@ -5,6 +5,7 @@ so this script wraps it in a full HTML document for Pages.
 Usage: python pipeline/build_site.py
 """
 import json
+import re
 from datetime import date
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from pipeline.parse_npci import build
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
+SITE_URL = "https://anubhavkumarkanth.github.io/upi-pulse/"
 
 
 def r2(x):
@@ -61,14 +63,26 @@ def site_data(df) -> dict:
     }
 
 
+def html_document(page: str) -> str:
+    """site/page.html as a full HTML document. Its title, description and font links come before its <style> and go
+    into <head>, where browsers and link previews (WhatsApp, LinkedIn) read them; the rest is the body."""
+    head, body = page.split("<style>", 1)
+    title = re.search(r"<title>(.*?)</title>", head).group(1)
+    description = re.search(r'<meta name="description" content="(.*?)">', head).group(1)
+    return ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+            f'{head.strip()}\n'
+            f'<meta property="og:title" content="{title}">\n<meta property="og:description" content="{description}">\n'
+            f'<meta property="og:type" content="website">\n<meta property="og:url" content="{SITE_URL}">\n'
+            f"</head>\n<body>\n<style>{body}\n</body>\n</html>\n")
+
+
 def main() -> None:
     DOCS.mkdir(exist_ok=True)
     data = site_data(build())
     (DOCS / "data.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
     page = (ROOT / "site" / "page.html").read_text(encoding="utf-8")
-    (DOCS / "index.html").write_text('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
-                                     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
-                                     f"</head>\n<body>\n{page}\n</body>\n</html>\n", encoding="utf-8")
+    (DOCS / "index.html").write_text(html_document(page), encoding="utf-8")
     print(f"docs/data.json: {(DOCS / 'data.json').stat().st_size / 1024:.0f} KB, {len(data['alerts'])} alerts")
 
 
