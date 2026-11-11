@@ -11,5 +11,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      # The Time Series of India copy is not in the repo, so its checks skip here and run on the author's machine.
       - run: pytest -q -rs

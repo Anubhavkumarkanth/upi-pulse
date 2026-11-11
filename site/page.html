@@ -320,12 +320,15 @@ pre.sql { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-rad
     }
     const ends = [];
     series.forEach(se => {
-      let d = "", started = false, last = null;
-      se.values.forEach((v, i) => { if (v == null) { started = false; return; } d += (started ? "L" : "M") + x(i).toFixed(1) + " " + y(v).toFixed(1); started = true; last = i; });
-      if (area && last != null) {
-        const first = se.values.findIndex(v => v != null);
-        s.append(svg("path", { d: d + `L${x(last)} ${y(0)}L${x(first)} ${y(0)}Z`, fill: se.color, "fill-opacity": 0.1, stroke: "none" }));
-      }
+      let d = "", fill = "", started = false, last = null;
+      // A blank month breaks the line, and the shaded area is one closed shape per unbroken run of months.
+      const close = () => { if (started) fill += `L${x(last)} ${y(0)}Z`; };
+      se.values.forEach((v, i) => {
+        if (v == null) { close(); started = false; return; }
+        const p = x(i).toFixed(1) + " " + y(v).toFixed(1);
+        d += (started ? "L" : "M") + p; fill += started ? "L" + p : `M${x(i)} ${y(0)}L` + p; started = true; last = i; });
+      close();
+      if (area && last != null) s.append(svg("path", { d: fill, fill: se.color, "fill-opacity": 0.1, stroke: "none" }));
       s.append(svg("path", { d, fill: "none", stroke: se.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
       if (last != null) {
         s.append(svg("circle", { cx: x(last), cy: y(se.values[last]), r: 4, fill: se.color, stroke: css("--surface"), "stroke-width": 2 }));
@@ -396,8 +399,8 @@ pre.sql { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-rad
     const first = s[0], now = s[s.length - 1];
     document.getElementById("td-text").textContent = `Across the top 50 ${SIDE_NAME[state.side]}, ${pct(now.td)} of payments failed for a technical reason in ${monthName(now.m)}, down from ${pct(first.td)} in ${monthName(first.m)}. That is about 1 in ${inr.format(Math.round(100 / now.td))} payments.`;
     document.getElementById("bd-text").textContent = `Business declines went from ${pct(first.bd)} to ${pct(now.bd)} of payments over the same period. These are declines for reasons like a wrong PIN, a low balance or a daily limit, so nothing broke, but the payment still did not go through.`;
-    const tableRows = s.map(r => [monthName(r.m), pct(r.td), pct(r.bd), `${r.under} of ${r.banks}`, inr.format(Math.round(r.vol)), r.src === "npci" ? "NPCI" : "Time Series of India"]);
-    for (const id of ["td-table", "bd-table"]) table(document.getElementById(id), ["Month", "Technical", "Business", "Under 1%", "Payments (mn)", "Copy used"], tableRows, [1, 2, 3, 4]);
+    const tableRows = s.map(r => [monthName(r.m), pct(r.td), pct(r.bd), r.under == null ? "–" : `${r.under} of ${r.banks}`, inr.format(Math.round(r.vol))]);
+    for (const id of ["td-table", "bd-table"]) table(document.getElementById(id), ["Month", "Technical", "Business", "Under 1%", "Payments (mn)"], tableRows, [1, 2, 3, 4]);
     const f = D.festive.filter(r => r.side === state.side);
     document.getElementById("festive-text").textContent = f.length ? "October and November, the festive season, ran lower than the rest of the year: " +
       f.map(r => `${r.year} ${pct(r.festive)} against ${pct(r.other)}`).join("; ") + "." : "";
@@ -537,14 +540,12 @@ pre.sql { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-rad
   }
 
   function renderNotes() {
-    const src = D.meta.sources, fmt = arr => arr.length ? `${monthName(D.meta.months.indexOf(arr[0]))} to ${monthName(D.meta.months.indexOf(arr[arr.length - 1]))}` : "none";
-    const npciRem = src.remitter.npci, tsoiRem = src.remitter.tsoi;
     const box = document.getElementById("notes"); box.replaceChildren();
     box.append(el("p", {}, "Source of all figures: National Payments Corporation of India (NPCI), UPI Ecosystem Statistics, Top 50 Member Performance. The data belongs to NPCI."));
     const ul = el("ul");
     [
-      `Paying banks: NPCI's own files for ${fmt(npciRem.filter(m => m < "2025"))} and ${monthName(D.meta.months.indexOf(npciRem[npciRem.length - 1]))}. ${fmt(tsoiRem)} comes from Time Series of India's copy of the same NPCI data, used while NPCI's site was down. Receiving banks: all months from that copy.`,
-      "Where both copies exist, every bank's technical and business decline rates match exactly. The copy has no approval, debit reversal or UDIR figures, so this page uses only volumes and decline rates.",
+      "Every month comes from NPCI's own files, kept as published.",
+      "Receiving banks, January 2025: NPCI published that month's percentages rounded to fractions (State Bank of India's technical declines read 0.00%, against 0.38% a month earlier). Its rates are left blank here, and the charts show a gap. Its payment counts are shown.",
       "Rates across banks are weighted by each bank's number of payments, so they show what a typical payer experiences.",
       "The 1% line is RBI's reported ask to NPCI, from press reports. It is not a published rule.",
       "NPCI published August 2022's debit reversal success rates without the decimal point (9123.00% for 91.23%). The pipeline corrects that month; the raw file is kept as published.",

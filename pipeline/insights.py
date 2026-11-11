@@ -142,7 +142,7 @@ def ask_claude(fact_sheet: dict) -> tuple[str, str]:
 def gemini_text(system: str, user: str, timeout: int = 45) -> tuple[str, str]:
     """Returns (reply text, model that wrote it), from Google Gemini's free tier. Shared with pipeline/ask.py."""
     from google import genai  # only needed for a real run
-    from google.genai import errors, types
+    from google.genai import types
 
     # Keep a reference to the client (a temporary one closes its connection), and cap each attempt at `timeout` seconds.
     client = genai.Client(http_options=types.HttpOptions(timeout=timeout * 1000))
@@ -152,8 +152,8 @@ def gemini_text(system: str, user: str, timeout: int = 45) -> tuple[str, str]:
             response = client.models.generate_content(
                 model=model, contents=user, config=types.GenerateContentConfig(system_instruction=system))
             return (response.text or "").strip(), response.model_version or model
-        except (errors.ServerError, errors.ClientError) as e:  # busy, timed out, out of quota or not offered to this key
-            tried.append(f"{model}: {e.code}")
+        except Exception as e:  # busy, timed out (an httpx error, not a Gemini one), out of quota or not offered to this key
+            tried.append(f"{model}: {getattr(e, 'code', None) or type(e).__name__}")
     raise RuntimeError("no Gemini model answered: " + "; ".join(tried))
 
 
