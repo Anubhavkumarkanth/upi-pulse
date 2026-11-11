@@ -251,6 +251,7 @@ def test_service_daily_cap_for_everyone(client, monkeypatch):
     codes = [client.post("/ask", json={"question": "Which bank?"}, headers={"X-Forwarded-For": f"203.0.113.{i}"}).status_code
              for i in range(4)]
     assert codes == [200, 200, 200, 429]
+    assert len(api._hits) == 3  # the visitor turned away is not stored, so refused requests cannot fill the memory
 
 
 def test_service_only_serves_the_site(client):

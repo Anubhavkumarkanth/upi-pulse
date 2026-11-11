@@ -46,9 +46,9 @@ def over_limit(ip: str, now: float) -> str | None:
         if _day != date.today():
             _day = date.today()
             _hits.clear()
-        mine = _hits.setdefault(ip, [])
-        if sum(map(len, _hits.values())) >= ALL_PER_DAY:
+        if sum(map(len, _hits.values())) >= ALL_PER_DAY:  # checked first, so a visitor turned away here is not stored
             return "The question box has answered all the questions it can today. Try again tomorrow."
+        mine = _hits.setdefault(ip, [])
         if len(mine) >= PER_DAY:
             return "You have asked today's limit of questions. Try again tomorrow."
         if sum(t > now - 60 for t in mine) >= PER_MINUTE:

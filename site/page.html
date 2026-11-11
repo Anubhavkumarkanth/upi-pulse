@@ -8,8 +8,8 @@
 :root {
   --bg: #f5f7fa; --surface: #ffffff; --ink: #0f1722; --ink-2: #485263; --muted: #7a8494;
   --rule: #e2e6ed; --axis: #c5ccd6; --accent: #1f5fbf; --accent-wash: #e8f0fb; --on-accent: #ffffff;
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
-  --good: #0f7a0f; --good-wash: #e5f4e5; --bad: #c23232; --bad-wash: #fbe9e9; --warn-wash: #fff4dc; --warn: #8a5a00;
+  --s1: #2a78d6; --s2: #7b5cd6; --s3: #1baf7a;
+  --good: #0f7a0f; --good-wash: #e5f4e5; --bad: #c23232; --bad-wash: #fbe9e9;
   --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
   --body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: light;
@@ -17,14 +17,14 @@
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #0e1117; --surface: #161a22; --ink: #eef1f6; --ink-2: #b7bfcc; --muted: #8a93a3;
   --rule: #262c37; --axis: #3a4250; --accent: #6ea8f0; --accent-wash: #1a2740; --on-accent: #0e1117;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
-  --good: #3fbf3f; --good-wash: #15301a; --bad: #f07272; --bad-wash: #3a1a1c; --warn-wash: #33290f; --warn: #f0c060;
+  --s1: #3987e5; --s2: #a48cf0; --s3: #199e70;
+  --good: #3fbf3f; --good-wash: #15301a; --bad: #f07272; --bad-wash: #3a1a1c;
   color-scheme: dark; } }
 :root[data-theme="dark"] {
   --bg: #0e1117; --surface: #161a22; --ink: #eef1f6; --ink-2: #b7bfcc; --muted: #8a93a3;
   --rule: #262c37; --axis: #3a4250; --accent: #6ea8f0; --accent-wash: #1a2740; --on-accent: #0e1117;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
-  --good: #3fbf3f; --good-wash: #15301a; --bad: #f07272; --bad-wash: #3a1a1c; --warn-wash: #33290f; --warn: #f0c060;
+  --s1: #3987e5; --s2: #a48cf0; --s3: #199e70;
+  --good: #3fbf3f; --good-wash: #15301a; --bad: #f07272; --bad-wash: #3a1a1c;
   color-scheme: dark;
 }
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -83,7 +83,7 @@ tbody tr:hover { background: var(--accent-wash); }
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
 .pill.good { background: var(--good-wash); color: var(--good); }
 .pill.bad { background: var(--bad-wash); color: var(--bad); }
-.pill.warn { background: var(--warn-wash); color: var(--warn); }
+.pill.unusual { background: var(--accent-wash); color: var(--accent); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
 label.field { display: grid; gap: 4px; font-size: 0.82rem; color: var(--ink-2); }
 select, input[type="number"] { font: inherit; font-size: 0.92rem; padding: 6px 8px; border: 1px solid var(--axis); border-radius: 7px; background: var(--surface); color: var(--ink); min-width: 0; }
@@ -397,7 +397,7 @@ pre.sql { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-rad
     lineChart(document.getElementById("td-chart"), { series: [{ name: "Technical declines", color: css("--s1"), values: td }], target: D.meta.td_target, area: true, yFmt: v => v.toFixed(v < 1 ? 2 : 1) + "%" });
     lineChart(document.getElementById("bd-chart"), { series: [{ name: "Business declines", color: css("--s2"), values: bd }], area: true });
     const first = s[0], now = s[s.length - 1];
-    document.getElementById("td-text").textContent = `Across the top 50 ${SIDE_NAME[state.side]}, ${pct(now.td)} of payments failed for a technical reason in ${monthName(now.m)}, down from ${pct(first.td)} in ${monthName(first.m)}. That is about 1 in ${inr.format(Math.round(100 / now.td))} payments.`;
+    document.getElementById("td-text").textContent = `Across the top 50 ${SIDE_NAME[state.side]}, ${pct(now.td)} of payments failed for a technical reason in ${monthName(now.m)}, down from ${pct(first.td)} in ${monthName(first.m)}.` + (now.td > 0 ? ` That is about 1 in ${inr.format(Math.round(100 / now.td))} payments.` : "");
     document.getElementById("bd-text").textContent = `Business declines went from ${pct(first.bd)} to ${pct(now.bd)} of payments over the same period. These are declines for reasons like a wrong PIN, a low balance or a daily limit, so nothing broke, but the payment still did not go through.`;
     const tableRows = s.map(r => [monthName(r.m), pct(r.td), pct(r.bd), r.under == null ? "–" : `${r.under} of ${r.banks}`, inr.format(Math.round(r.vol))]);
     for (const id of ["td-table", "bd-table"]) table(document.getElementById(id), ["Month", "Technical", "Business", "Under 1%", "Payments (mn)"], tableRows, [1, 2, 3, 4]);
@@ -489,7 +489,7 @@ pre.sql { margin: 8px 0 0; padding: 10px 12px; background: var(--bg); border-rad
     const a = D.alerts.filter(r => r.side === state.side), r = D.meta.alert_rule;
     document.getElementById("alerts-text").textContent = `A month is flagged when a bank's technical decline rate is at least ${r.min_rise} point above its own usual level (the median of its previous 12 months) and far outside its normal ups and downs: ${r.z} or more robust standard deviations. ${a.length} bank-months among ${SIDE_NAME[state.side]} meet both since 2022; the latest 15 are below. This is plain statistics, with no AI model involved.`;
     table(document.getElementById("alerts"), ["Month", "Bank", "Technical", "Usual", "Times its normal swing", ""],
-      a.slice(0, 15).map(x => [monthName(x.m), bank(x.b).n, pct(x.td), pct(x.usual), `${x.z.toFixed(1)}×`, el("span", { class: "pill warn" }, "! Unusual")]), [2, 3, 4]);
+      a.slice(0, 15).map(x => [monthName(x.m), bank(x.b).n, pct(x.td), pct(x.usual), `${x.z.toFixed(1)}×`, el("span", { class: "pill unusual" }, "! Unusual")]), [2, 3, 4]);
   }
 
   // Shop calculator: expected failures = payments x (customers' banks' weighted rate + your bank's receiving rate).

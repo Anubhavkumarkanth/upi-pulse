@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.build_site import site_data
+from pipeline.build_site import html_document, site_data
 from pipeline.parse_npci import build
 
 
@@ -37,7 +37,16 @@ def test_published_site_is_built_from_the_current_data_and_page():
         del d["meta"]["built"]  # the build date
     assert published == fresh, "docs/data.json is stale: run python -m pipeline.build_site"
     page = (root / "site" / "page.html").read_text(encoding="utf-8")
-    assert page in (root / "docs" / "index.html").read_text(encoding="utf-8"), "docs/index.html is stale"
+    assert (root / "docs" / "index.html").read_text(encoding="utf-8") == html_document(page), "docs/index.html is stale"
+
+
+def test_title_and_description_are_in_the_head():
+    # Link previews read <head> only, so the page's title and description must be there, with matching og: tags.
+    page = (Path(__file__).resolve().parents[1] / "site" / "page.html").read_text(encoding="utf-8")
+    head, body = html_document(page).split("</head>")
+    assert "<title>UPI Pulse</title>" in head and '<meta name="description"' in head
+    assert '<meta property="og:title" content="UPI Pulse">' in head and '<meta property="og:description" content="How reliably' in head
+    assert "<title>" not in body and body.count("<style>") == 1
 
 
 def test_page_never_turns_text_into_html():
